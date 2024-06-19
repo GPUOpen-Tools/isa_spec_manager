@@ -3,7 +3,7 @@ A set of tools for parsing and using AMD's machine-readable GPU ISA specificatio
 
 The `IsaDecoder` API makes it easy to parse the specification XML files, decode instructions and even decode whole shaders.
 
-For usage examples, see the [examples subfolder](https://github.amd.com/Developer-Solutions/isa_spec_manager/tree/amd-main/source/examples).
+For usage examples, see the [examples subfolder](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/source/examples).
 
 ## Building isa_spec_manager
 To build the project, use the build scripts located in the ./build subfolder. Please note that the build process requires CMake with minimum version of 3.0.
@@ -32,4 +32,4 @@ The following example files can give you a quick overview of how to start using 
 * Usage example with multiple architectures in flight: [./source/examples/multi_arch_decoder.cpp](./source/examples/multi_arch_decoder.cpp)
 
 ## Getting the ISA specification files
-The Machine-Readable GPU ISA specification files can be downloaded from [AMD's Machine-Readable GPU ISA Specification page on GPUOpen.com](https://gpuopenstaging.wpengine.com/machine-readable-isa/).
+The Machine-Readable GPU ISA specification files can be downloaded from [AMD's Machine-Readable GPU ISA Specification page on GPUOpen.com](https://gpuopen.com/machine-readable-isa/).
