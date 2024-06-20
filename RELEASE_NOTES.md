@@ -5,12 +5,12 @@
 AMD's machine-readable GPU Instruction Set Architecture specifications is a set of XML files that describe AMD's latest GPU ISA: instructions, encodings, operands, data formats and even human-readable description strings. 
 
 The first release includes the specification XML files for the following GPU architectures:
-* MI-300
-* MI-200
-* MI-100
-* RDNA3
-* RDNA2
-* RDNA
+* AMD CDNA™ 3 (Instinct™ MI300)
+* AMD CDNA™ 2 (Instinct™ MI200)
+* AMD CDNA™ 1 (Instinct™ MI100)
+* AMD RDNA™ 3
+* AMD RDNA™ 2
+* AMD RDNA™ 1
 
 The XML files can be downloaded from [GPUOpen.com](https://gpuopen.com/machine-readable-isa/).
 
