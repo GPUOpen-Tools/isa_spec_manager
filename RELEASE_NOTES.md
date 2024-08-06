@@ -21,7 +21,7 @@ This codebase includes the `IsaDecoder` API that can be used to decode, which ca
 
 For usage examples and instructions on how to build the project, please see [source/examples subdirectory on the isa_spec_manager GitHub repository](https://github.com/GPUOpen-Tools/isa_spec_manager).
 
-**Note:** while the `IsaDecoder` API is a good way to get started with parsing the XML files, nothing prevents you from parsing the files yourself and building your own custom workflow. To do that please refer to the XML schema documentation [XML schema documentation](https://github.com/GPUOpen-Tools/isa_spec_manager/main/spec_documentation.md).
+**Note:** while the `IsaDecoder` API is a good way to get started with parsing the XML files, nothing prevents you from parsing the files yourself and building your own custom workflow. To do that please refer to the XML schema documentation [XML schema documentation](https://github.com/GPUOpen-Tools/isa_spec_manager/blob/main/documentation/spec_documentation.md).
 
 ## Known issues ##
 
