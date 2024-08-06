@@ -45,7 +45,7 @@ List of child elements:
 | 3. | Encodings     | [\<Encodings\>](#encodings-element)       | Lists all encodings supported by the architecture. Examples of the provided information by this element: instruction sizes, fields of the binary instruction, general description of the encoding. |
 | 4. | Data formats  | [\<DataFormats\>](#dataformats-element)   | Lists all data formats in the architecture. It provides additional information on how the values in the registers should be treated. This element is referenced by the instruction element. Examples of provided information by this element: is the value integer or float? If it is float where is the mantissa, exponent and sign? |
 | 5. | Operand types | [\<OperandTypes\>](#operandtypes-element) | Lists all operand types in the architecture. The sub-elements of this element are referenced by an instruction element. It provides information on the types of the operands used by the instruction. Examples of provided information are: is the operand a scalar or a vector register? What is the name of this operand when represented in assembly?|
-| 6. | Operand types | [\<FunctionalGroups\>](#functionalgroups-element) | Lists all functional groups in the architecture. A function group provides high-level classification of the instructions, such as: vector memory, vector ALU, scalar memory, etc. |
+| 6. | Functional groups | [\<FunctionalGroups\>](#functionalgroups-element) | Lists all functional groups in the architecture. A function group provides high-level classification of the instructions, such as: vector memory, vector ALU, scalar memory, etc. |
 
 ### Architecture element
 Hierarchy: \<Spec\> → \<ISA\> → **\<Architecture\>**
