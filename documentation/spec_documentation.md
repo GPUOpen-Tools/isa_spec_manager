@@ -35,8 +35,8 @@ Description: top level element which holds information about the ISA specificati
 List of child elements:
 | #  | Element                      | XML element name | Description |
 | -- | ---------------------------- | ---------------- | - |
-| 1. | Document                     | [\<Document\>](#document-element) | XML document related information. |
-| 2. | Instruction Set Architecture | [\<ISA\>](#isa-element)           | ISA related information. |
+| 1. | Document                     | [\<Document\>](#document) | XML document related information. |
+| 2. | Instruction Set Architecture | [\<ISA\>](#isa)           | ISA related information. |
 
 ### \<Document\> 
 Hierarchy: \<Spec\> → **\<Document\>**
@@ -59,12 +59,12 @@ Description: contains ISA related information.
 List of child elements:
 | #  | Element       | XML element name | Description|
 | - | ------------- | ---------------- | - |
-| 1. | Architecture  | [\<Architecture\>](#architecture-element) | Architecture-specific meta data. |
-| 2. | Instructions  | [\<Instructions\>](#instructions-element) | Lists all instructions in the architecture. This is the core element of the specification. Every instruction references other XML elements. Examples of provided information by this element: different ways to encode the instruction, the type of operands, the data format of the operand, etc. |
-| 3. | Encodings     | [\<Encodings\>](#encodings-element)       | Lists all encodings supported by the architecture. Examples of the provided information by this element: instruction sizes, fields of the binary instruction, general description of the encoding. |
-| 4. | Data formats  | [\<DataFormats\>](#dataformats-element)   | Lists all data formats in the architecture. It provides additional information on how the values in the registers should be treated. This element is referenced by the instruction element. Examples of provided information by this element: is the value integer or float? If it is float where is the mantissa, exponent and sign? |
-| 5. | Operand types | [\<OperandTypes\>](#operandtypes-element) | Lists all operand types in the architecture. The sub-elements of this element are referenced by an instruction element. It provides information on the types of the operands used by the instruction. Examples of provided information are: is the operand a scalar or a vector register? What is the name of this operand when represented in assembly?|
-| 6. | Functional groups | [\<FunctionalGroups\>](#functionalgroups-element) | Lists all functional groups in the architecture. A function group provides high-level classification of the instructions, such as: vector memory, vector ALU, scalar memory, etc. |
+| 1. | Architecture  | [\<Architecture\>](#architecture) | Architecture-specific meta data. |
+| 2. | Instructions  | [\<Instructions\>](#instructions) | Lists all instructions in the architecture. This is the core element of the specification. Every instruction references other XML elements. Examples of provided information by this element: different ways to encode the instruction, the type of operands, the data format of the operand, etc. |
+| 3. | Encodings     | [\<Encodings\>](#encodings)       | Lists all encodings supported by the architecture. Examples of the provided information by this element: instruction sizes, fields of the binary instruction, general description of the encoding. |
+| 4. | Data formats  | [\<DataFormats\>](#dataformats)   | Lists all data formats in the architecture. It provides additional information on how the values in the registers should be treated. This element is referenced by the instruction element. Examples of provided information by this element: is the value integer or float? If it is float where is the mantissa, exponent and sign? |
+| 5. | Operand types | [\<OperandTypes\>](#operandtypes) | Lists all operand types in the architecture. The sub-elements of this element are referenced by an instruction element. It provides information on the types of the operands used by the instruction. Examples of provided information are: is the operand a scalar or a vector register? What is the name of this operand when represented in assembly?|
+| 6. | Functional groups | [\<FunctionalGroups\>](#functionalgroups) | Lists all functional groups in the architecture. A function group provides high-level classification of the instructions, such as: vector memory, vector ALU, scalar memory, etc. |
 
 ### \<Architecture\>
 Hierarchy: \<Spec\> → \<ISA\> → **\<Architecture\>**
@@ -86,7 +86,7 @@ Description: lists all instructions in the architecture. This is the core elemen
 List of child elements:
 | #  | Element                | XML element name | Description|
 | -- | ---------------------- | ---------------- | - |
-| 1. | Instruction (singular) | [\<Instruction\>](#instruction-element)    | Information about a single instruction in this architecture.|
+| 1. | Instruction (singular) | [\<Instruction\>](#instruction)    | Information about a single instruction in this architecture.|
 
 ### \<Instruction\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → **\<Instruction\>**
@@ -96,10 +96,10 @@ Description: information about a single instruction in this architecture, includ
 List of child elements:
 | #  | Element               | XML element name       | Description |
 | -- | --------------------- | ---------------------- | - |
-| 1. | Instruction flags     | [\<InstructionFlags\>](#instructionflags-element)     | Information about basic features of the instruction. For example, is the instruction a branch? Does it terminate the program? |
+| 1. | Instruction flags     | [\<InstructionFlags\>](#instructionflags)     | Information about basic features of the instruction. For example, is the instruction a branch? Does it terminate the program? |
 | 2. | Instruction name      | \<InstructionName\>      | The name of the instruction. This is the assembly name of the instruction.|
 | 3. | Description           | \<Description\>          | Description of the operation performed by the instruction. |
-| 4. | Instruction encodings | [\<InstructionEncodings\>](#instructionencodings-element) | Lists all encodings this instruction can be represented in. |
+| 4. | Instruction encodings | [\<InstructionEncodings\>](#instructionencodings) | Lists all encodings this instruction can be represented in. |
 
 ### \<InstructionFlags\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → **\<InstructionFlags\>**
@@ -121,7 +121,7 @@ Description: lists all encodings this instruction can be represented in.
 List of child elements:
 | #  | Element              | XML element name      | Description |
 | -- | -------------------- | --------------------- | - |
-| 1. | Instruction encoding (singular) | [\<InstructionEncoding\>](#instructionencoding-element) |  One possible encoding version given instruction can be represented in. |
+| 1. | Instruction encoding (singular) | [\<InstructionEncoding\>](#instructionencoding) |  One possible encoding version given instruction can be represented in. |
 
 ### \<InstructionEncoding\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → \<InstructionEncodings\> → **\<InstructionEncoding\>**
@@ -131,10 +131,10 @@ Description: one possible encoding version given instruction can be represented 
 List of child elements:
 | #  | Element       | XML element name | Description|
 | -- | ------------- | ---------------- | - |
-| 1. | Encoding name | \<EncodingName\>   | The encoding name the given instruction is represented in. Should match one of the names in the list of [\<Encodings\>](#encodings-element)|
+| 1. | Encoding name | \<EncodingName\>   | The encoding name the given instruction is represented in. Should match one of the names in the list of [\<Encodings\>](#encodings)|
 | 2. | EncodingCondition | \<ConditionName\> | Name of the condition that must be true to select this encoding. |
 | 2. | Opcode        | \<Opcode\>         | The opcode value of the instruction when represented in this encoding. |
-| 3. | Operands      | [\<Operands\>](#operands-element) | Lists all operands of the instruction when represented in this encoding. |
+| 3. | Operands      | [\<Operands\>](#operands) | Lists all operands of the instruction when represented in this encoding. |
 
 ### \<Operands\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → \<InstructionEncodings\> → \<InstructionEncoding\>  → **\<Operands\>**
@@ -144,7 +144,7 @@ Description: lists all operands of the instruction when represented in this enco
 List of child elements:
 | #  | Element | XML element name | Description|
 | -- | ------- | ---------------- | - |
-| 1. | Operand (singular) | [\<Operand\>](#operand-element) | Information about a single operand in the instruction. |
+| 1. | Operand (singular) | [\<Operand\>](#operand) | Information about a single operand in the instruction. |
 
 ### \<Operand\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → \<InstructionEncodings\> → \<InstructionEncoding\>  → \<Operands\>  → **\<Operand\>**
@@ -154,9 +154,9 @@ Description: Information about a single operand in the instruction.
 List of child elements:
 | #  | Element          | XML element name | Description                                                                                                   |
 | -- | ---------------- | ---------------- | - |
-| 1. | Field name       | \<FieldName\>      | Encoding field name. Should match one of the fields in [\<BitMap\>](#bitmap-element-microcodeformat). |
-| 2. | Data format name | \<DataFormatName\> | Data format of the operand. Should match one of the formats in [\<DataFormats\>](#dataformats-element). |
-| 3. | Operand type     | \<OperantType\>    | Type of the operand. Should match one of the types in [\<OperandTypes\>](#operandtypes-element)|
+| 1. | Field name       | \<FieldName\>      | Encoding field name. Should match one of the fields in [\<BitMap\>](#bitmap-microcodeformat). |
+| 2. | Data format name | \<DataFormatName\> | Data format of the operand. Should match one of the formats in [\<DataFormats\>](#dataformats). |
+| 3. | Operand type     | \<OperantType\>    | Type of the operand. Should match one of the types in [\<OperandTypes\>](#operandtypes)|
 | 4. | Operand size     | \<OperandSize\>    | The size of this operand in bits. |
 
 
@@ -178,7 +178,7 @@ Description: lists all encodings supported by the architecture. Examples of the 
 List of child elements:
 |#  | Element             | XML element name | Description |
 |-- | ------------------- | ---------------- | - |
-|1. | Encoding (singular) | [\<Encoding\>](#encoding-element) | Information about a single encoding in this architecture. |
+|1. | Encoding (singular) | [\<Encoding\>](#encoding) | Information about a single encoding in this architecture. |
 
 ### \<Encoding\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Encodings\> → **\<Encoding\>**
@@ -191,10 +191,10 @@ List of child elements:
 | 1. | Encoding name            | \<EncodingName\>           | Encoding name. For example, VOP1, SOP1, etc. |
 | 2. | Bit count                | \<BitCount\>               | Size of the encoding in bits. |
 | 3. | Encoding identifier mask | \<EncodingIdentifierMask\> | Binary mask to identify the encoding. |
-| 4. | Encoding identifiers     | [\<EncodingIdentifiers\>](#encodingidentifiers-element)  | Lists all unique identifiers which are used to map to the encoding. |
-| 5. | Encoding conditions      | [\<EncodingConditions\>](#encodingconditions-element)    | Lists all encoding conditions. A condition specifies cases when the encoding can be extended with extra fields such as literal constant, DPP, etc. |
+| 4. | Encoding identifiers     | [\<EncodingIdentifiers\>](#encodingidentifiers)  | Lists all unique identifiers which are used to map to the encoding. |
+| 5. | Encoding conditions      | [\<EncodingConditions\>](#encodingconditions)    | Lists all encoding conditions. A condition specifies cases when the encoding can be extended with extra fields such as literal constant, DPP, etc. |
 | 6. | Description              | \<Description\>            | Encoding description. |
-| 7. | Microcode format         | [\<MicrocodeFormat\> → \<BitMap\>](#bitmap-element-microcodeformat) | Information about binary break down of the encoding. |
+| 7. | Microcode format         | [\<MicrocodeFormat\> → \<BitMap\>](#bitmap-microcodeformat) | Information about binary break down of the encoding. |
 
 
 List of attributes:
@@ -220,7 +220,7 @@ Description: lists all encoding conditions. A condition specifies cases when the
 List of child elements:
 | #  | Element            | XML element name    | Description|
 | -- | ------------------ | ------------------- | -|
-| 1. | Encoding Condition (singular) | [\<EncodingCondition\>](#encodingcondition-element) | A single condition. |
+| 1. | Encoding Condition (singular) | [\<EncodingCondition\>](#encodingcondition) | A single condition. |
 
 ### \<EncodingCondition\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Encodings\> → \<Encoding\>  → \<EncodingConditions\> → **\<EncodingCondition\>**
@@ -241,7 +241,7 @@ Description: a bitmap holds a detailed breakdown of the fields in the given enco
 List of child elements:
 | #  | Element | XML element name | Description |
 | -- | ------- | ---------------- | - |
-| 1. | Field   | [\<Field\>](#field-element-microcodeformat--bitmap) | A single field from the list of fields in the bitmap. The field specifies the raw binary instruction must be broken down and interpreted.|
+| 1. | Field   | [\<Field\>](#field-microcodeformat--bitmap) | A single field from the list of fields in the bitmap. The field specifies the raw binary instruction must be broken down and interpreted.|
 
 ### \<Field\> (MicrocodeFormat → BitMap)
 Hierarchy: \<Spec\> → \<ISA\> → \<Encodings\> → \<Encoding\>  → \<MicrocodeFormat\> → \<BitMap\> → **\<Field\>**
@@ -264,7 +264,7 @@ Description: lists all data fromats in the architecture. It provides additional 
 List of child elements:
 | #  | Element                | XML element name | Description|
 | -- | ---------------------- | ---------------- | - |
-| 1. | Data format (singular) | [\<DataFormat\>](#dataformat-element) | Information about a single data format in this architecture. |
+| 1. | Data format (singular) | [\<DataFormat\>](#dataformat) | Information about a single data format in this architecture. |
 
 ### \<DataFormat\>
 Hierarchy: \<Spec\> → \<ISA\> → \<DataFormats\> → **\<DataFormat\>**
@@ -278,7 +278,7 @@ List of child elements:
 | 2. | Description      | \<Description\>    | Data format description. |
 | 3. | Data type        | \<DataType\>       | Data type. For example, descriptor, bits, float.|
 | 4. | Component count  | \<ComponentCount\> | Indicates the number of components this format packs into the given bits if data is packed. |
-| 5. | Data attributes  | [\<DataAttributes\> → \<BitMap\>](#bitmap-element-dataattributes) | Information about each component in the data format. |
+| 5. | Data attributes  | [\<DataAttributes\> → \<BitMap\>](#bitmap-dataattributes) | Information about each component in the data format. |
 
 ### \<BitMap\> (DataAttributes)
 Hierarchy: \<Spec\> → \<ISA\> → \<DataFormats\> →  \<DataFormat\>  →  \<DataAttributes\> → **\<BitMap\>**
@@ -288,7 +288,7 @@ Description: information about each component in the data format.
 List of child elements:
 | #  | Element | XML element name | Description|
 | -- | ------- | ---------------- | - |
-| 1. | Field   | [\<Field\>](#field-element-dataattributes--bitmap) | Describes a single compoent field of the data format. |
+| 1. | Field   | [\<Field\>](#field-dataattributes--bitmap) | Describes a single compoent field of the data format. |
 
 ### \<Field\> (DataAttributes → BitMap)
 Hierarchy: \<Spec\> → \<ISA\> → \<DataFormats\> →  \<DataFormat\>  →  \<DataAttributes\> →  \<BitMap\>  → **\<Field\>**
@@ -317,7 +317,7 @@ Description: the sub-elements of this element are referenced by an instruction e
 List of child elements:
 | #  | Element                 | XML element name | Description|
 | -- | ----------------------- | ---------------- | - |
-| 1. | Operand type (singular) | [\<OperandType\>](#operandtype-element) | Information about a single operand type in the architecture. |
+| 1. | Operand type (singular) | [\<OperandType\>](#operandtype) | Information about a single operand type in the architecture. |
 
 ### \<OperandType\>
 Hierarchy: \<Spec\> → \<ISA\> → \<OperandTypes\> → **\<OperandType\>**
@@ -329,7 +329,7 @@ List of child elements:
 | -- | ------------------------- | ------------------------- | -|
 | 1. | Operand type name         | \<OperandTypeName\>         | Name of the operand as defined in the ISA. For example, v1, s3, vcc, etc. |
 | 2. | Subtypes                  | \<Subtypes\>                | Lists all subtype names that compose the give type. |
-| 3. | Operand predefined values | [\<OperandPredefinedValues\>](#operandpredefinedvalues-element) | Lists all predefined operand values. A predefined value maps encoded integer value in the binary opcode to the corresponding assembly name. |
+| 3. | Operand predefined values | [\<OperandPredefinedValues\>](#operandpredefinedvalues) | Lists all predefined operand values. A predefined value maps encoded integer value in the binary opcode to the corresponding assembly name. |
 
 ### \<OperandPredefinedValues\>
 Hierarchy: \<Spec\> → \<ISA\> → \<OperandTypes\> →  \<OperandType\> → **\<OperandPredefinedValues\>**
@@ -339,7 +339,7 @@ Description: lists all predefined operand values. A predefined value maps encode
 List of child elements:
 | #  | Element                  | XML element name         | Description|
 | -- | ------------------------ | ------------------------ | - |
-| 1. | Operand predefined value | [\<OperandPredefinedValue\>](#operandpredefinedvalue-element) | Maps encoded integer value in the binary opcode to the corresponding assembly name. |
+| 1. | Operand predefined value | [\<OperandPredefinedValue\>](#operandpredefinedvalue) | Maps encoded integer value in the binary opcode to the corresponding assembly name. |
 
 
 ### \<OperandPredefinedValue\>
@@ -364,7 +364,7 @@ Description: lists all functional groups in the architecture. A function group p
 List of child elements:
 | #  | Element          | XML element name | Description |
 | -- | ---------------- | ---------------- | - |
-| 1. | Functional Group (singular) | [\<FunctionalGroup\>](#functionalgroup-element) | Provides high-level classification of the instruction, such as: vector memory, vector ALU, scalar memory, etc. |
+| 1. | Functional Group (singular) | [\<FunctionalGroup\>](#functionalgroup) | Provides high-level classification of the instruction, such as: vector memory, vector ALU, scalar memory, etc. |
 
 ### \<FunctionalGroup\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → \<FunctionalGroups\> → **\<FunctionalGroup\>**
@@ -375,7 +375,7 @@ List of child elements:
 | #  | Element              | XML element name      | Description |
 | -- | -------------------- | --------------------- | - |
 | 1. | Name | \<Name\> | Name of the functional group. |
-| 2. | Subgroup | [\<Subgroup\>](#Subgroup-element) | Name of the associated subgroup. |
+| 2. | Subgroup | [\<Subgroup\>](#Subgroup) | Name of the associated subgroup. |
 
 ### \<Subgroup\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → \<FunctionalGroups\> → \<FunctionalGroup\> → **\<Subgroup\>**
