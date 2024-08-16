@@ -5,8 +5,8 @@ ISA Spec Manager CLI program is an example program that leverages IsaSpecApi. Th
 To decode an instruction that is represented in the binary (machine code) format using CLI, run the commands below. 
 
 ```bash
-cd IsaSpecManager-Win64/cli
-./IsaSpecCli.exe -x ../../Specification/xml/gfx11.xml -d BE804814
+cd isa_spec_manager-Win64/cli
+./isa_spec_cli.exe -x ../../Specification/xml/gfx11.xml -d BE804814
 ```
 As can be seen from the command, `-x` flag should be followed by the path to the machine-readable XML specification. Next, `-d` flag should be followed by the instruction in the binary form. Note that the provided instruction should be encoded in the specified architecture. After running the command, the CLI outputs the following:
 
@@ -33,8 +33,8 @@ If decoded successfully, CLI outputs the instruction in an assembly form, descri
 To retrieve information about a specific instruction from the spec, the name of the instruction could be provided to the CLI. Refer to the commands below.
 
 ```bash
-cd IsaSpecManager-Win64/cli
-./IsaSpecCli.exe -x ../../Specification/xml/gfx11.xml -i s_setpc_b64
+cd isa_spec_manager-Win64/cli
+./isa_spec_cli.exe -x ../../Specification/xml/gfx11.xml -i s_setpc_b64
 ```
 As can be seen from the command, `-x` flag should be followed by the path to the machine-readable XML specification. Next, `-i` flag should be followed by the name of the instruction which we are interested in. Note, that the requested instruction should be present in the specified architecture. After running the command, CLI outputs the following:
 

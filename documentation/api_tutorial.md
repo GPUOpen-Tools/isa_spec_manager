@@ -1,148 +1,113 @@
-# Tutorial: "Decoding RDNA Instructions with IsaDecoder" #
+# Decoding RDNA Instructions with IsaDecoder API
 
-## Motivation ##
-
+## Motivation
 AMD recently released its machine-readable GPU ISA specification - a set of XML files describing its RDNA and CDNA Instruction Set Architectures. While you can parse the XML files yourself, the easiest way to consume the specification is using the `IsaDecoder` API: Given an XML specification file, the API can read and parse it for you and even decode single instructions or whole shaders.
 
 This tutorial demonstrates how to use the `IsaDecoder` API to decode AMD GPU assembly provided in either binary or textual (disassembly) format.
 
-## `IsaDecoder` ##
-
+## Getting started with `IsaDecoder` API
 The API allows you to decode either a single instruction or a whole shader/kernel.
 
 The source code for the API can be found on the [isa_spec_manager GitHub repository](https://github.com/GPUOpen-Tools/isa_spec_manager).
 
-## Getting started - `IsaDecoder` ##
+### Step 1: Instantiate `IsaDecoder`.
 
-Step 1: Instantiate `IsaDecoder`.
+`IsaDecoder` is defined under the namespace amdisa. For this tutorial, we define an `IsaDecoder` object named "decoder". 
 
-`IsaDecoder` is defined under the namespace amdisa. For this tutorial, we define an `IsaDecoder` object named "api_decoder". 
 ```c
-amdisa::IsaDecoder api_decoder;
+amdisa::IsaDecoder decoder;
 ```
 
-Step 2: Initialize the `IsaDecoder` object with an input XML specification file. Make sure that the XML file you are using matches the GPU architecture that you are about to decode instructions for. For instance, use the MI-300 XML file to decode MI-300 kernels.
+### Step 2: Initialize the `IsaDecoder` object.
+Initialize the `decoder` with an input XML specification file. Make sure that the XML file you are using matches the GPU architecture that you are about to decode instructions for. For instance, use the MI-300 XML file to decode MI-300 kernels.
 
 The `Initialize()` API function reads and parses the given XML specification file. Upon success, the `IsaDecoder` object is ready to decode instructions.
+
 ```c
 bool is_success = api_decoder.Initialize(kPathToSpec, error_msg);
 ```
+## A. Decoding a single instruction in textual format
 
-## 1. Decoding a single instruction ##
+Now, when we have the decoded initialized, let's learn how we can use API to decode an instruction's disassembly to retrieve its human-readable description. Consider the following textual representation of an RDNA instruction: `v_mov_b32`.
 
-### 1.1 Decoding a single instruction in binary format ###
-
-Consider the following binary representation of an RDNA instruction: `8BEA7E6A`. Let's use the API to decode it.
-
-Step 1: Create a variable to store the binary representation.
-```c
-const std::string kStrSampleInstructionBinary = "8BEA7E6A"; 
-```
-
-Step 2: Convert the binary representation to its decimal equivalent.
-
-We convert the hexadecimal value to its unsigned int (decimal) equivalent with the help of std::stringstream as shown below. This is, of course, only necessary for the sake of this example. In the wild, you will be able to use the API directly on binary machine code obtained from AMD GPU Code Objects.
-```c
-std::stringstream IsaInstructionStream;
-IsaInstructionStream << kStrSampleInstructionBinary;
-uint64_t instruction_binary = 0;
-IsaInstructionStream >> std::hex >> instruction_binary;
-```
-
-**Note**: To use std::stringstream, we will have to ```#include <sstream>```
-
-Step 3: Create an empty `InstructionInfoBundle`<sup>[2]</sup>.
-
-To obtain the decoded information, we pass an empty data structure `amdisa::InstructionInfoBundle`.
-```c
-amdisa::InstructionInfoBundle instruction_info_bundle;
-```
-
-Step 4: Call the `DecodeInstruction()` API function.
-
-We then proceed to provide the decimal equivalent `instruction_binary`, `instruction_info_bundle`, and `error_msg` to `DecodeInstruction()` which returns true on successful decode and false if the decoding fails.
-```c    
-bool is_success = api_decoder.DecodeInstruction(instruction_binary, instruction_info_bundle, error_msg);
-```
-
-**Note**: It is possible to provide a decimal equivalent directly to the DecodeInstruction() API. Skip 2 & 3.
-
-Output:
-    Instruction Name: S_AND_B64
-    Instruction Description: Bitwise AND.
-    Encoding Name: ENC_SOP2
-    Encoding Description: SCALAR ALU OPERATIONS WITH ONE DESTINATION AND TWO SOURCES.
-        ALLOWED PATTERNS:
-        SOP2 (32 BITS)
-        SOP2 + LITERAL (64 BITS)
-
-`8BEA7E6A` decodes to a scalar ALU instruction (`S_AND_B64`) that performs bitwise AND operation. The instruction's encoding is `ENC_SOP2` implying a scalar ALU operation with one destination and two sources.
-
-### 1.2 Decoding a single instruction in texual format ###
-
-Now, let's learn how the API can be used to decode an instruction's disassembly to retrieve its human-readable description. Consider the following textual representation of an RDNA instruction: `v_mov_b32`.
-
-Step 1: Create a variable to store the instruction name.
-```c
-const std::string kStrSampleInstruction = "v_mov_b32";
-```
-
-Step 2: Create an empty `InstructionInfo`<sup>[1]</sup> struct variable.
+### Step 1: Create an empty instance `InstructionInfo`<sup>[Appendix 1]</sup> object.
+The `InstructionInfo` struct is the primary structure used by the API to provide information about an instruction. Typically, an empty instance of this struct is passed to the API, which then populates its fields with the relevant data. Before we request information about an instruction, let's create an instance of `InstructionInfo`.
 ```c
 amdisa::InstructionInfo instruction_info;
 ```
 
-Step 3: Call the `DecodeInstruction()` API function.
-
-We then proceed to provide the instruction name `kStrSampleInstruction`, `instruction_info1, and `error_msg` to `DecodeInstruction()`. Returns true on successful decode and false if the decoding fails. The failure reason is populated in the error_msg.
+### Step 2: Call the `DecodeInstruction()` API function.
+We then proceed to provide the instruction name `v_mov_b32`, `instruction_info, and `error_msg` to `DecodeInstruction()`. The method returns true on successful decode and false if the decoding fails. The failure reason is populated in the error_msg.
 ```c    
-bool is_success = api_decoder.DecodeInstruction(kStrSampleInstruction, instruction_info, error_msg);
+bool is_success = api_decoder.DecodeInstruction("v_mov_b32",
+    instruction_info, error_msg);
 ```
-
-Output:
-On a successful decode, we get the following information from instruction_info.
-    
+That's it, on a successful decode, we get the following information from instruction_info.
+```
     Instruction Name: V_MOV_B32
     Instruction Description: Move data to a VGPR.
+```
 
-## 2. Decoding a whole shader ##
+## B. Decoding a single instruction.
+Now, let's try decoding a single instruction in machine code format. Consider the following binary representation of an RDNA instruction: `8BEA7E6A`. Let's use the API to decode it.
 
-### 2.1 Decoding a whole shader in binary format ###
+### Step 1: Create an empty `InstructionInfoBundle`<sup>[Appendix 2]</sup>.
+To obtain the decoded information, we pass an empty data structure `InstructionInfoBundle`. The `InstructionInfoBundle` is a simple wrapper around the `InstructionInfo` struct that was introduced use case A earlier. The bundle is designed to store multiple `InstructionInfo` instances. This is necessary because, in the RDNA3 architecture, some instructions are "dual instructions," meaning a single binary-encoded instruction can decode into two separate instructions. To handle and store information about both instructions, the `InstructionInfoBundle` was introduced.
 
+```c
+amdisa::InstructionInfoBundle instruction_info_bundle;
+```
+
+### Step 2: Call the `DecodeInstruction()` API function.
+We then proceed to provide the decimal equivalent `instruction_binary`, `instruction_info_bundle`, and `error_msg` to `DecodeInstruction()` which returns true on successful decode and false if the decoding fails.
+
+```c    
+bool is_success = decoder.DecodeInstruction(0x8BEA7E6A,
+    instruction_info_bundle, error_msg);
+```
+```
+Output:
+    Instruction Name: S_AND_B64
+    Instruction Description: Bitwise AND.
+    Encoding Name: ENC_SOP2
+    Encoding Description:
+        SCALAR ALU OPERATIONS WITH
+        ONE DESTINATION AND TWO SOURCES.
+        ALLOWED PATTERNS:
+        SOP2 (32 BITS)
+        SOP2 + LITERAL (64 BITS)
+```
+`8BEA7E6A` decodes to a scalar ALU instruction (`S_AND_B64`) that performs bitwise AND operation. The instruction's encoding is `ENC_SOP2` implying a scalar ALU operation with one destination and two sources.
+
+
+## C. Decoding a whole shader
 The API accepts and decodes a whole shader in the form of binary stream of instructions. Let's have a look at the following binary stream of instructions:
 ```
-`8BEA7E6A D6130002 00884D02`
+8BEA7E6A D6130002 00884D02
 ```
 
-Step 1: Create a variable to store the sample instructions in binary format.
+### Step 1: Store the stream in the vector.
 ```c
-std::string sample_instructions_binary = "8BEA7E6A D6130002 00884D02";
+std::vector<uint32_t> inst_stream = {0x8BEA7E6A, 0xD6130002, 0x00884D02};
 ```
 
-Step 2: Convert the sample instructions to their respective binary format and store in a std::vector\<uint32_t\>. This is, of course, only necessary for the sake of this example. In practice you can use this API call directly on sequences of AMD GPU assembly instructions. 
-```c
-std::vector<uint32_t> sample_instructions;
-std::stringstream SampleInstructionStream(sample_instructions_binary);
-uint32_t instruction_binary;
-while (SampleInstructionStream >> std::hex >> instruction_binary) {
-    sample_instructions.push_back(instruction_binary);
-}
-```
+### Step 2: Create a vector of `InstructionInfoBundle`<sup>[Appendix 3]</sup>.
+Earlier, we demonstrated how to decode a single instruction and store the decoded information in a structure called `InstructionInfoBundle`. Now, we'll decode a vector of instructions, which logically requires a vector of `InstructionInfoBundle`. So, let's create an instance of that.
 
-Step 3: Create a vector of `InstructionInfoBundle`<sup>[3]</sup>.
-To obtain the decoded information, we pass an empty vector of `amdisa::InstructionInfoBundle`.
 ```c
 std::vector<amdisa::InstructionInfoBundle> instruction_info_bundle;
 ```
 
-Step 4: Call the `DecodeInstructionStream()` API
+### Step 3: Call the `DecodeInstructionStream()` API.
 
-We then proceed to provide the vector of sample instructions in binary format `SampleInstructions`, `instruction_info_bundle`, and `error_msg` to `DecodeInstructionStream()` API. 
+We then proceed to provide the vector of sample instructions in machine code format `inst_stream`, `instruction_info_bundle`, and `error_msg` to `DecodeInstructionStream()` API. 
+
 ```c
-bool is_success = api_decoder.DecodeInstructionStream(SampleInstructions, instruction_info_bundle, error_msg);
+bool is_success = decoder.DecodeInstructionStream(inst_stream,
+    instruction_info_bundle, error_msg);
 ```
-
-Output:
+The output will contain the following data.
+```
     Instruction Name: S_AND_B64
     Instruction Description: Bitwise AND.
     Encoding Name: ENC_SOP2
@@ -150,38 +115,34 @@ Output:
     Instruction Name: V_FMA_F32
     Instruction Description: Fused single precision multiply add.
     Encoding Name: ENC_VOP3
-
+```
 **Note**: The `V_FMA_F32` instruction is represented using two dwords (2 x 32-bit). Thus, from the given sample instructions of the shader, two instructions are decoded.
 
-### 2.2 Decoding a whole shader in disassembly format ###
+## D. Decoding a whole shader in disassembly format.
+The API can also decode a whole shader in AMD's disassembly format. Decoding an entire shader in disassembly format is conceptually similar to the use case C above; the shader in disassembly format is essentially a stream of instructions. We'll now use an API to decode this stream of instructions directly from a file that was disassembled by the LLVM compiler. Consider decoding the shader disassembly file "example_shader_disassembly".
 
-The API can also decode a whole shader in AMD's disassembly format. Consider decoding the shader disassembly file "example_shader_disassembly".
-
-Step 1: Create a variable to store the shader disassembly file path.
-```c
-const std::string kPathToShaderFile = "/path/to/example_shader_disassembly";
-```
-
-Step 2: Create a vector of `InstructionInfoBundle`<sup>[3]</sup> variable.
+### Step 1: Create a vector of `InstructionInfoBundle`.
 To obtain the decoded information, we pass an empty data structure `amdisa::InstructionInfoBundle`.
 ```c
-amdisa::InstructionInfoBundle instruction_info_stream;
+std::vector<amdisa::InstructionInfoBundle> instruction_info_stream;
 ```
 
-Step 3: Call the DecodeInstruction() API function.
+### Step 2: Call the `DecodeShaderDisassemblyFile()` API.
 
-We then proceed to provide the path to the shader disassembly file, `instruction_info_strea`, `error_msg`, and `resolve_direct_branch_targets` to `DecodeShaderText()`.
+We then proceed to provide the path to the shader disassembly file, `instruction_info_stream`, `error_msg`, and `resolve_direct_branch_targets` to `DecodeShaderText()`.
 ```c
-bool is_success = api_decoder.DecodeShaderText(kPathToShaderFile, instruction_info_stream, error_msg, resolve_direct_branch_targets);
+const char* kPathToShaderFile = "path/to/file";
+bool is_success = decoder.DecodeShaderDisassemblyFile(kPathToShaderFile,
+    instruction_info_stream, error_msg, resolve_direct_branch_targets);
 ```
 
 **Note**: `resolve_direct_branch_targets` is an optional parameter. Setting it to `true` enables determining the direct branch's target instruction's index in the `instruction_info_bundle` vector which will be available in the `InstructionInfo.instruction_semantic_info.branch_info` struct's member `branch_target_index`. For example, in the following shader:
     
-    s_branch      label_05F4                              // 000000000000: BFA00004
+    s_branch    label_05F4         // 000000000000: BFA00004
     label_05E4:
-    v_mov_b32     v28, 0                                  // 000000000004: 7E380280
+    v_mov_b32   v28, 0             // 000000000004: 7E380280
     label_05F4:
-    v_fma_f32     v0, s10, s10, v0                        // 000000000008: D6130000 0400140A
+    v_fma_f32   v0, s10, s10, v0   // 000000000008: D6130000 0400140A
 
 The target instruction index of the s_branch instruction will be 2, i.e, the third instruction v_fma_f32. Indexing in the instruction_info_bundle starts from 0.
 
