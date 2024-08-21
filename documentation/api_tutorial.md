@@ -1,4 +1,4 @@
-# Decoding Instructions with IsaDecoder API
+# Decoding RDNA/CDNA Instructions with IsaDecoder API
 
 ## Motivation
 AMD recently released its machine-readable GPU ISA specification - a set of XML files describing its RDNA and CDNA Instruction Set Architectures. While you can parse the XML files yourself, the easiest way to consume the specification is using the `IsaDecoder` API: Given an XML specification file, the API can read and parse it for you and even decode single instructions or whole shaders.
@@ -28,7 +28,7 @@ bool is_success = api_decoder.Initialize(kPathToSpec, error_msg);
 ```
 ## A. Decoding a single instruction in textual format
 
-Now, when we have the decoder initialized, let's learn how we can use API to decode an instruction's disassembly to retrieve its human-readable description. Consider the following textual representation of an RDNA 1 instruction: `V_RCP_IFLAG_F32`.
+Now, when we have the decoder initialized, let's learn how we can use API to decode an instruction's disassembly to retrieve its human-readable description. Consider the following textual representation of an RDNA 1 instruction: `V_CVT_PK_U8_F32`.
 
 ### Step 1: Create an empty instance `InstructionInfo`<sup>[Appendix 1]</sup> object.
 The `InstructionInfo` struct is the primary structure used by the API to provide information about an instruction. Typically, an empty instance of this struct is passed to the API, which then populates its fields with the relevant data. Before we request information about an instruction, let's create an instance of `InstructionInfo`.
@@ -37,26 +37,27 @@ amdisa::InstructionInfo instruction_info;
 ```
 
 ### Step 2: Call the `DecodeInstruction()` API function.
-We then proceed to provide the instruction name `V_RCP_IFLAG_F32`, `instruction_info, and `error_msg` to `DecodeInstruction()`. The method returns true on successful decode and false if the decoding fails. The failure reason is populated in the error_msg.
+We then proceed to provide the instruction name `V_CVT_PK_U8_F32`, `instruction_info, and `error_msg` to `DecodeInstruction()`. The method returns true on successful decode and false if the decoding fails. The failure reason is populated in the error_msg.
 ```c    
-bool is_success = api_decoder.DecodeInstruction("v_mov_b32",
+bool is_success = api_decoder.DecodeInstruction("V_CVT_PK_U8_F32",
     instruction_info, error_msg);
 ```
 That's it, on a successful decode, we get the following information from instruction_info.
 ```
-    Instruction Name: V_RCP_IFLAG_F32
+    Instruction Name: V_CVT_PK_U8_F32
     Instruction Description:
-        Calculate the reciprocal of the vector
-        float input in a manner suitable for integer division and store
-        the result into a vector  register. This opcode is intended
-        for use as part of an integer division macro.
+        Convert  a single-precision float value from
+        the first input to an unsigned 8-bit integer
+        value and  pack the result into one byte of
+        the third input using the second input as a
+        byte select. Store the result into a vector register.
 ```
 
 ## B. Decoding a single instruction.
 Now, let's try decoding a single instruction in machine code format. Consider the following binary representation of an RDNA 3 instruction: `8BEA7E6A`. Let's use the API to decode it.
 
 ### Step 1: Create an empty `InstructionInfoBundle`<sup>[Appendix 2]</sup>.
-To obtain the decoded information, we pass an empty data structure `InstructionInfoBundle`. The `InstructionInfoBundle` is a simple wrapper around the `InstructionInfo` struct that was introduced use case A earlier. The bundle is designed to store multiple `InstructionInfo` instances. This is necessary because, in the RDNA 3 architecture, some instructions are "dual instructions," meaning a single binary-encoded instruction can decode into two separate instructions. To handle and store information about both instructions, the `InstructionInfoBundle` was introduced.
+To obtain the decoded information, we pass an empty data structure `InstructionInfoBundle`. The `InstructionInfoBundle` is a simple wrapper around the `InstructionInfo` struct that was introduced use case A earlier. The bundle is designed to store multiple `InstructionInfo` instances. This is necessary because, in the RDNA 3 architecture, some instructions are "dual instructions," meaning a single binary-encoded instruction may be decode into two separate instructions. To handle and store information about both instructions, the `InstructionInfoBundle` was introduced.
 
 ```c
 amdisa::InstructionInfoBundle instruction_info_bundle;
