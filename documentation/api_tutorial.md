@@ -1,4 +1,4 @@
-# Decoding RDNA Instructions with IsaDecoder API
+# Decoding Instructions with IsaDecoder API
 
 ## Motivation
 AMD recently released its machine-readable GPU ISA specification - a set of XML files describing its RDNA and CDNA Instruction Set Architectures. While you can parse the XML files yourself, the easiest way to consume the specification is using the `IsaDecoder` API: Given an XML specification file, the API can read and parse it for you and even decode single instructions or whole shaders.
@@ -10,7 +10,7 @@ The API allows you to decode either a single instruction or a whole shader/kerne
 
 The source code for the API can be found on the [isa_spec_manager GitHub repository](https://github.com/GPUOpen-Tools/isa_spec_manager).
 
-### Step 1: Instantiate `IsaDecoder`.
+### Step 1: Instantiate `amdisa::IsaDecoder`.
 
 `IsaDecoder` is defined under the namespace amdisa. For this tutorial, we define an `IsaDecoder` object named "decoder". 
 
@@ -18,8 +18,8 @@ The source code for the API can be found on the [isa_spec_manager GitHub reposit
 amdisa::IsaDecoder decoder;
 ```
 
-### Step 2: Initialize the `IsaDecoder` object.
-Initialize the `decoder` with an input XML specification file. Make sure that the XML file you are using matches the GPU architecture that you are about to decode instructions for. For instance, use the MI-300 XML file to decode MI-300 kernels.
+### Step 2: Initialize the decoder.
+Initialize the `decoder` with an input XML specification file. Make sure that the XML file you are using matches the GPU architecture that you are about to decode instructions for. For instance, use the MI-300/CDNA 3 XML file to decode MI-300/CDNA 3 kernels.
 
 The `Initialize()` API function reads and parses the given XML specification file. Upon success, the `IsaDecoder` object is ready to decode instructions.
 
@@ -28,7 +28,7 @@ bool is_success = api_decoder.Initialize(kPathToSpec, error_msg);
 ```
 ## A. Decoding a single instruction in textual format
 
-Now, when we have the decoded initialized, let's learn how we can use API to decode an instruction's disassembly to retrieve its human-readable description. Consider the following textual representation of an RDNA instruction: `v_mov_b32`.
+Now, when we have the decoder initialized, let's learn how we can use API to decode an instruction's disassembly to retrieve its human-readable description. Consider the following textual representation of an RDNA 1 instruction: `V_RCP_IFLAG_F32`.
 
 ### Step 1: Create an empty instance `InstructionInfo`<sup>[Appendix 1]</sup> object.
 The `InstructionInfo` struct is the primary structure used by the API to provide information about an instruction. Typically, an empty instance of this struct is passed to the API, which then populates its fields with the relevant data. Before we request information about an instruction, let's create an instance of `InstructionInfo`.
@@ -37,22 +37,26 @@ amdisa::InstructionInfo instruction_info;
 ```
 
 ### Step 2: Call the `DecodeInstruction()` API function.
-We then proceed to provide the instruction name `v_mov_b32`, `instruction_info, and `error_msg` to `DecodeInstruction()`. The method returns true on successful decode and false if the decoding fails. The failure reason is populated in the error_msg.
+We then proceed to provide the instruction name `V_RCP_IFLAG_F32`, `instruction_info, and `error_msg` to `DecodeInstruction()`. The method returns true on successful decode and false if the decoding fails. The failure reason is populated in the error_msg.
 ```c    
 bool is_success = api_decoder.DecodeInstruction("v_mov_b32",
     instruction_info, error_msg);
 ```
 That's it, on a successful decode, we get the following information from instruction_info.
 ```
-    Instruction Name: V_MOV_B32
-    Instruction Description: Move data to a VGPR.
+    Instruction Name: V_RCP_IFLAG_F32
+    Instruction Description:
+        Calculate the reciprocal of the vector
+        float input in a manner suitable for integer division and store
+        the result into a vector  register. This opcode is intended
+        for use as part of an integer division macro.
 ```
 
 ## B. Decoding a single instruction.
-Now, let's try decoding a single instruction in machine code format. Consider the following binary representation of an RDNA instruction: `8BEA7E6A`. Let's use the API to decode it.
+Now, let's try decoding a single instruction in machine code format. Consider the following binary representation of an RDNA 3 instruction: `8BEA7E6A`. Let's use the API to decode it.
 
 ### Step 1: Create an empty `InstructionInfoBundle`<sup>[Appendix 2]</sup>.
-To obtain the decoded information, we pass an empty data structure `InstructionInfoBundle`. The `InstructionInfoBundle` is a simple wrapper around the `InstructionInfo` struct that was introduced use case A earlier. The bundle is designed to store multiple `InstructionInfo` instances. This is necessary because, in the RDNA3 architecture, some instructions are "dual instructions," meaning a single binary-encoded instruction can decode into two separate instructions. To handle and store information about both instructions, the `InstructionInfoBundle` was introduced.
+To obtain the decoded information, we pass an empty data structure `InstructionInfoBundle`. The `InstructionInfoBundle` is a simple wrapper around the `InstructionInfo` struct that was introduced use case A earlier. The bundle is designed to store multiple `InstructionInfo` instances. This is necessary because, in the RDNA 3 architecture, some instructions are "dual instructions," meaning a single binary-encoded instruction can decode into two separate instructions. To handle and store information about both instructions, the `InstructionInfoBundle` was introduced.
 
 ```c
 amdisa::InstructionInfoBundle instruction_info_bundle;
