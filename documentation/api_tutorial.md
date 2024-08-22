@@ -1,4 +1,4 @@
-# Decoding RDNA/CDNA Instructions with IsaDecoder API
+# Decoding RDNA™/CDNA™ Instructions with IsaDecoder API
 
 ## Motivation
 AMD recently released its machine-readable GPU ISA specification - a set of XML files describing its RDNA and CDNA Instruction Set Architectures. While you can parse the XML files yourself, the easiest way to consume the specification is using the `IsaDecoder` API: Given an XML specification file, the API can read and parse it for you and even decode single instructions or whole shaders.
@@ -124,7 +124,7 @@ The output will contain the following data.
 **Note**: The `V_FMA_F32` instruction is represented using two dwords (2 x 32-bit). Thus, from the given sample instructions of the shader, two instructions are decoded.
 
 ## D. Decoding a whole shader in disassembly format.
-The API can also decode a whole shader in AMD's disassembly format. Decoding an entire shader in disassembly format is conceptually similar to the use case C above; the shader in disassembly format is essentially a stream of instructions. We'll now use an API to decode this stream of instructions directly from a file that was disassembled by the LLVM compiler. Consider decoding the shader disassembly file "example_shader_disassembly".
+The API can also decode a whole shader in AMD's disassembly format. Decoding an entire shader in disassembly format is conceptually similar to the use case C above; the shader in disassembly format is essentially a stream of instructions. We'll now use an API to decode this shader from a RDNA 3 disassembly file that contains a single shader disassembly.
 
 ### Step 1: Create a vector of `InstructionInfoBundle`.
 To obtain the decoded information, we pass an empty data structure `amdisa::InstructionInfoBundle`.
