@@ -5,6 +5,8 @@ AMD recently released its machine-readable GPU ISA specification - a set of XML 
 
 This tutorial demonstrates how to use the `IsaDecoder` API to decode AMD GPU assembly provided in either binary or textual (disassembly) format.
 
+In addition to this tutorial, make sure to check out the API usage examples in the [examples subfolder](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/source/examples) of this repository.
+
 ## Getting started with `IsaDecoder` API
 The API allows you to decode either a single instruction or a whole shader/kernel.
 
