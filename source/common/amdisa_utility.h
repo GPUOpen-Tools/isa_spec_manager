@@ -7,6 +7,7 @@
 // C++ libraries.
 #include <string>
 #include <vector>
+#include <cstdint>
 
 namespace amdisa
 {
