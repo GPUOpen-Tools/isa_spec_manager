@@ -78,26 +78,29 @@ namespace amdisa
     std::string AmdIsaUtility::Strip(const std::string& str)
     {
         std::string stripped_str;
-        int32_t     pos_start = 0;
-        size_t      pos_end   = str.length() - 1;
-
-        // Skip leading whitespaces and special chars.
-        auto should_skip = [](const char& c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; };
-        while (pos_start < str.length() && should_skip(str[pos_start]))
+        if (str.length() > 0)
         {
-            ++pos_start;
-        }
+            int32_t pos_start = 0;
+            size_t  pos_end   = str.length() - 1;
 
-        // Skip trailing whitespaces and special chars.
-        while (pos_end - pos_start >= 0 && should_skip(str[pos_end]))
-        {
-            --pos_end;
-        }
+            // Skip leading whitespaces and special chars.
+            auto should_skip = [](const char& c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; };
+            while (pos_start < str.length() && should_skip(str[pos_start]))
+            {
+                ++pos_start;
+            }
 
-        // Get the middle.
-        for (size_t i = pos_start; i <= pos_end && pos_end != std::string::npos; i++)
-        {
-            stripped_str += str[i];
+            // Skip trailing whitespaces and special chars.
+            while (pos_end - pos_start >= 0 && should_skip(str[pos_end]))
+            {
+                --pos_end;
+            }
+
+            // Get the middle.
+            for (size_t i = pos_start; i <= pos_end && pos_end != std::string::npos; i++)
+            {
+                stripped_str += str[i];
+            }
         }
 
         return stripped_str;

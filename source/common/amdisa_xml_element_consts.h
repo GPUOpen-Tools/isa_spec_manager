@@ -80,7 +80,6 @@ namespace amdisa
     static const char* kElementInstructionBranchTargetLabel = "InstructionBranchTargetLabel";
     static const char* kElementInstructionBranchTargetIndex = "InstructionBranchTargetIndex";
     static const char* kElementInstructionFlags             = "InstructionFlags";
-    static const char* kElementFunctionalGroup              = "FunctionalGroup";
     static const char* kElementExecutionUnit                = "ExecutionUnit";
     static const char* kElementFlagIsBranch                 = "IsBranch";
     static const char* kElementFlagIsConditionalBranch      = "IsConditionalBranch";
@@ -99,6 +98,8 @@ namespace amdisa
     static const char* kElementOperands                = "Operands";
     static const char* kElementOperand                 = "Operand";
     static const char* kElementOperandTypes            = "OperandTypes";
+    static const char* kElementOperandSubtypes         = "Subtypes";
+    static const char* kElementOperandSubtype          = "Subtype";
     static const char* kElementOperandSize             = "OperandSize";
     static const char* kElementOperandType             = "OperandType";
     static const char* kElementOperandTypeName         = "OperandTypeName";
@@ -122,6 +123,11 @@ namespace amdisa
     static const char* kElementComponentCount       = "ComponentCount";
     static const char* kElementBinaryRepresentation = "BinaryRepresentation";
     static const char* kElementIsInstructionDecoded = "IsInstructionDecoded";
+    static const char* kElementSubgroup             = "Subgroup";
+    static const char* kElementFunctionalGroup      = "FunctionalGroup";
+    static const char* kElementFunctionalGroups     = "FunctionalGroups";
+    static const char* kElementFunctionalSubgroups  = "FunctionalSubgroups";
+    static const char* kElementFunctionalSubgroup   = "FunctionalSubgroup";
 
     // Attributes of XML elements.
     static const char* kAttributePublishDate               = "PublishDate";
@@ -138,10 +144,5 @@ namespace amdisa
     static const char* kAttributeIsPartitioned             = "IsPartitioned";
     static const char* kAttributeType                      = "Type";
     static const char* kAttributeTypeName                  = "Name";
-    static const char* kAttributeTypeSubgroup              = "Subgroup";
-    static const char* kAttributeTypeFunctionalGroups      = "FunctionalGroups";
-    static const char* kAttributeTypeFunctionalGroup       = "FunctionalGroup";
-    static const char* kAttributeTypeFunctionalSubgroups   = "FunctionalSubgroups";
-    static const char* kAttributeTypeFunctionalSubgroup    = "FunctionalSubgroup";
 }  // namespace amdisa
 #endif  // AMDISA_XML_ELEMENT_CONSTS_H_

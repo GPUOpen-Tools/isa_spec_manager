@@ -50,6 +50,13 @@ int main(int argc, char* argv[])
         std::cout << kStrInfoInitializingSpec << kPathToSpec << std::endl;
         is_success = spec_api_example.Initialize(kPathToSpec, error_msg);
 
+        // Print API version and XML compatibility messages.
+        std::cout << "API version: " << spec_api_example.GetVersion() << std::endl;
+        if (error_msg.length() > 0)
+        {
+            std::cout << error_msg << std::endl;
+        }
+
         // Check if the ISA spec is initialized.
         if (!is_success)
         {
@@ -116,6 +123,12 @@ int main(int argc, char* argv[])
                 //                                 branch_offset, branch_target_PC,
                 //                                 branch_target_index)
             }
+        }
+
+        // Print debug log messages if present.
+        for (const std::string& message : spec_api_example.GetDebugLog())
+        {
+            std::cout << message << std::endl;
         }
     }
 

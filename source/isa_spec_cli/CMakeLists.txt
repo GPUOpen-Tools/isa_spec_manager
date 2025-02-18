@@ -6,6 +6,13 @@ set (SRC_DIR ../../source)
 set (THIRD_PARTY_DIR ../third_party)
 set (INC_DIR ../../include)
 
+# Control the path of tinyxml2.
+set (TINYXML_DIR ${THIRD_PARTY_DIR}/tinyxml2)
+if (TINYXML_SRC_PATH)
+    message("-- IsaSpecCli: Overwritting default tinyxml2 source files with ${TINYXML_SRC_PATH}")
+    set (TINYXML_DIR ${TINYXML_SRC_PATH})
+endif()
+
 # Redirect to single build output location
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
@@ -31,7 +38,7 @@ set (ALL_H
 
     # Third party library headers.
     ${THIRD_PARTY_DIR}/cxxopts/cxxopts.hpp
-    ${THIRD_PARTY_DIR}/tinyxml2/tinyxml2.h
+    ${TINYXML_DIR}/tinyxml2.h
 )
 
 # Setting all source files for this project.
@@ -52,7 +59,7 @@ target_include_directories(isa_spec_cli PRIVATE
     ${SRC_DIR}/common
     ${SRC_DIR}/isa_spec_cli/cli_processor
     ${THIRD_PARTY_DIR}/cxxopts
-    ${THIRD_PARTY_DIR}/tinyxml2
+    ${TINYXML_DIR}
     PUBLIC
     ${INC_DIR}/amdisa
 )

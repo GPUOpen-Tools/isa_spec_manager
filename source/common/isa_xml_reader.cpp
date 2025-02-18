@@ -41,6 +41,10 @@ namespace amdisa
     static const char* kStringErrorXmlReadErrorTypeTreeParseIssue =
         "Error: Failed to read expression tree. Failed to parse one of the "
         "elements of the type tree.";
+    static const char* kStringErrorXmlEmptyFunctionalGroups = 
+        "Error : Failed to read XML file. Functional groups information is missing.";
+    static const char* kStringErrorXmlEmptyFunctionalSubgroups = 
+        "Error : Failed to read XML file. Functional subgroups information is missing.";
 
     // Type defintions.
     using XmlComment  = tinyxml2::XMLComment;
@@ -943,15 +947,15 @@ namespace amdisa
                 }
 
                 // Populate functional group and subgroup info
-                XmlElement* functional_group_element = GetElementByName(kAttributeTypeFunctionalGroup, *instructions_xml_iterator);
+                XmlElement* functional_group_element = GetElementByName(kElementFunctionalGroup, *instructions_xml_iterator);
                 if (functional_group_element != nullptr)
                 {
-                    XmlElement* functional_group_name_element = GetElementByName(kAttributeTypeName, functional_group_element);
+                    XmlElement* functional_group_name_element = GetElementByName(kElementName, functional_group_element);
                     if (functional_group_name_element != nullptr)
                     {
                         single_instruction.functional_group_name = ExtractText(functional_group_name_element);
                     }
-                    XmlElement* functional_subgroup_name_element = GetElementByName(kAttributeTypeSubgroup, functional_group_element);
+                    XmlElement* functional_subgroup_name_element = GetElementByName(kElementSubgroup, functional_group_element);
                     if (functional_subgroup_name_element != nullptr)
                     {
                         single_instruction.functional_subgroup_name = ExtractText(functional_subgroup_name_element);
@@ -1244,6 +1248,7 @@ namespace amdisa
             const char* is_partitioned_attribute  = operand_types_xml_iterator->Attribute(kAttributeIsPartitioned);
             XmlElement* operand_type_name_element = GetElementByName(kElementOperandTypeName, *operand_types_xml_iterator);
             XmlElement* description_element       = GetElementByName(kElementDescription, *operand_types_xml_iterator);
+            XmlElement* subtypes_element          = GetElementByName(kElementOperandSubtypes, *operand_types_xml_iterator);
 
             // Check the validity of the retrieved elements.
             bool is_optype_elements_retrieved = is_partitioned_attribute != nullptr && operand_type_name_element != nullptr && description_element != nullptr;
@@ -1258,6 +1263,17 @@ namespace amdisa
                 single_operand_type.name           = ExtractText(operand_type_name_element);
                 TrimHtml(ExtractText(description_element, true), single_operand_type.description);
                 single_operand_type.is_partitioned = std::strcmp(is_partitioned_attribute, "true") == 0;
+
+                // Subtype names.
+                if (subtypes_element != nullptr)
+                {
+                    XmlIterator subtype_iterator = XmlIterator(subtypes_element->FirstChildElement());
+                    while (subtype_iterator.IsValid())
+                    {
+                        single_operand_type.subtype_names.push_back(ExtractText(*subtype_iterator));
+                        ++subtype_iterator;
+                    }
+                }
 
                 // Go over individual predefined values.
                 XmlElement* operand_predefined_values_element = GetElementByName(kElementOperandPredefinedValues, *operand_types_xml_iterator);
@@ -1299,12 +1315,22 @@ namespace amdisa
     }
 
     // Reads the functional group and subgroup information from the XML's <FunctionalGroups> and populates spec_data's functional_group_info
-    static void ReadFunctionalGroupInfo(const XmlElement* isa_element, IsaSpec& spec_data, std::string& err_message)
+    static bool ReadFunctionalGroupInfo(const XmlElement* isa_element, IsaSpec& spec_data, std::string& err_message)
     {
         bool should_abort = false;
 
-        XmlElement* functionalgroups_element     = GetElementByName(kAttributeTypeFunctionalGroups, isa_element);
-        XmlIterator functionalgroup_xml_iterator = XmlIterator(functionalgroups_element->FirstChildElement());
+        XmlElement* functionalgroups_element     = GetElementByName(kElementFunctionalGroups, isa_element);
+        XmlIterator functionalgroup_xml_iterator = nullptr;
+        if (functionalgroups_element != nullptr)
+        {
+            functionalgroup_xml_iterator = XmlIterator(functionalgroups_element->FirstChildElement());
+        }
+        else
+        {
+            should_abort = true;
+            err_message  = kStringErrorXmlEmptyFunctionalGroups;
+            assert(false);
+        }
 
         // Go over all individual data format XML elements.
         while (!should_abort && functionalgroup_xml_iterator.IsValid())
@@ -1321,6 +1347,34 @@ namespace amdisa
             // Increment operand type iterator.
             ++functionalgroup_xml_iterator;
         }
+
+        XmlElement* functionalsubgroups_element     = GetElementByName(kElementFunctionalSubgroups, isa_element);
+        XmlIterator functionalsubgroup_xml_iterator = nullptr;
+        if (functionalsubgroups_element != nullptr)
+        {
+            functionalsubgroup_xml_iterator = XmlIterator(functionalsubgroups_element->FirstChildElement());
+        }
+        else {
+            should_abort = true;
+            err_message  = kStringErrorXmlEmptyFunctionalSubgroups;
+            assert(false);
+        }
+
+        // Go over all individual data format XML elements.
+        while (!should_abort && functionalsubgroup_xml_iterator.IsValid())
+        {
+            FunctionalSubgroupInfo info;
+            XmlElement*            name_element     = GetElementByName(kElementName, *functionalsubgroup_xml_iterator);
+
+            info.name = ExtractText(name_element);
+
+            spec_data.functional_subgroup_info.push_back(info);
+
+            // Increment operand type iterator.
+            ++functionalsubgroup_xml_iterator;
+        }
+
+        return !should_abort;
     }
 
     // *** INTERNALLY-LINKED AUXILIARY FUNCTIONS - END ***
@@ -1428,7 +1482,7 @@ namespace amdisa
 
         if (is_read_successful)
         {
-            ReadFunctionalGroupInfo(isa_element, spec_data, err_message);
+            is_read_successful = ReadFunctionalGroupInfo(isa_element, spec_data, err_message);
         }
 
         return is_read_successful;

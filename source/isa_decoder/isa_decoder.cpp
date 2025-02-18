@@ -26,11 +26,7 @@
 
 namespace amdisa
 {
-    // Supported XML version.
-    static const char* kMaxSupportedSchemaVersion = "1.0.0";
-
     // Error string constants.
-    static const char* kStringErrorUnsupportedXml              = "Error: Unsupported XML schema version. Check for an updated version of the API.";
     static const char* kStringErrorEmptyRange                  = "Error: Processing empty range.";
     static const char* kStringErrorEncodingNotFound            = "Error: Encoding or opcode not found for the instruction: ";
     static const char* kStringErrorEmptyOperandName            = "Error: Empty operand name was provided.";
@@ -52,11 +48,19 @@ namespace amdisa
     static const char* kStringErrorApiImplAllocationFailed     = "Error: API Implementation object allocation failed";
     static const char* kStringErrorManagerImplAllocationFailed = "Error: Manager Implementation object allocation failed";
     static const char* kStringErrorEmptyRangesInField          = "Error: Range is empty for the field: ";
+    static const char* kStringErrorEncodingIdentifiersNotFound = "Error: Could not find the encoding identifier for the instruction.";
 
     // Decoder manager string constants.
     static const char* kStringErrorDecodeManagerUnknownArch  = "Error: Undefined architecture in specification.";
     static const char* kStringErrorDecodeManagerInitFailed   = "Error: Failed to initialize ISA specification. Provided file path: ";
     static const char* kStringErrorDecodeManagerArchNotFound = "Error: Provided architecture was not initialized.";
+
+    // Warnings.
+    static const char* kStringWarningEmptyStream            = "Warning: Trying to get DWORD from an empty stream.";
+    static const char* kStringWarningOutRangeDwordAccess    = "Warning: GetField() was provided short working_dwords.";
+    static const char* kStringWarningApiInitSameMappingInst = "Warning: Id is mapping to the same instruction.";
+    static const char* kStringWarningApiInitSameMappingEnc  = "Warning: Id is mapping to the same instruction encoding.";
+    static const char* kStringWarningSegBits                = "Warning: Marked with SEG field, but doesn't match with constants.";
 
     // Encoding modifier definitions. Constructed based on the PDF ISA.
     static const char* kModifierNameNegation       = "NEG";
@@ -79,14 +83,14 @@ namespace amdisa
     static const std::map<std::string, uint32_t> kSegBits = {{"ENC_FLAT", 0}, {"ENC_FLAT_SCRATCH", 1}, {"ENC_FLAT_GLBL", 2}, {"ENC_FLAT_GLOBAL", 2}};
 
     // Map architecture IDs to enums.
-    static const std::map<uint32_t, GpuArchitecture> kArchitectureIdToEnum = {
-        { 0, GpuArchitecture::kCdna1 },
-        { 1, GpuArchitecture::kCdna2 },
-        { 2, GpuArchitecture::kCdna3 },
-        { 5, GpuArchitecture::kRdna1 },
-        { 6, GpuArchitecture::kRdna2 },
-        { 8, GpuArchitecture::kRdna3 }
-    };
+    static const std::map<uint32_t, GpuArchitecture> kArchitectureIdToEnum = {{0, GpuArchitecture::kCdna1},
+                                                                              {1, GpuArchitecture::kCdna2},
+                                                                              {2, GpuArchitecture::kCdna3},
+                                                                              {5, GpuArchitecture::kRdna1},
+                                                                              {6, GpuArchitecture::kRdna2},
+                                                                              {8, GpuArchitecture::kRdna3},
+                                                                              {9, GpuArchitecture::kRdna3_5},
+                                                                              {10, GpuArchitecture::kRdna4}};
 
     // Masks.
     static const uint32_t kDwordMask = 0xffffffff;
@@ -127,7 +131,7 @@ namespace amdisa
             is_empty_ = machine_code_stream_.empty();
         }
 
-        uint32_t GetNextDword()
+        uint32_t GetNextDword(std::vector<std::string>& warnings)
         {
             uint32_t ret = 0;
             if (!is_empty_)
@@ -138,12 +142,12 @@ namespace amdisa
             }
             else
             {
-                std::cerr << "Warning: Nothing to get, the stream is empty." << std::endl;
+                warnings.push_back(kStringWarningEmptyStream);
             }
             return ret;
         }
 
-        bool IsEmpty()
+        bool IsEmpty() const
         {
             return is_empty_;
         }
@@ -153,7 +157,7 @@ namespace amdisa
         bool                 is_empty_ = true;
     };
 
-    static uint64_t GetFieldValue(const Field& field, const std::vector<uint32_t>& working_dwords)
+    static uint64_t GetFieldValue(const Field& field, const std::vector<uint32_t>& working_dwords, std::vector<std::string>& log)
     {
         Range    range;
         uint64_t field_value = 0;
@@ -169,13 +173,13 @@ namespace amdisa
             }
             else
             {
-                std::cout << "Warning: DWORD is 0" << std::endl;
+                log.push_back(kStringWarningOutRangeDwordAccess);
             }
             uint64_t mask = ((1ULL << bit_count) - 1);
             field_value   = (dword >> (bit_offset - 32 * dword_index)) & mask;
             if (!AmdIsaUtility::GetRange(field, range))
             {
-                std::cerr << kStringErrorEmptyRange << std::endl;
+                log.push_back(kStringErrorEmptyRange);
                 assert(false);
             }
             uint64_t padding_size = range.padding.bit_count;
@@ -187,13 +191,16 @@ namespace amdisa
         }
         else
         {
-            std::cerr << kStringErrorEmptyRange << std::endl;
+            log.push_back(kStringErrorEmptyRange);
             assert(false);
         }
         return field_value;
     }
 
-    static void RetrieveFieldInfo(const std::vector<uint32_t>& working_dwords, const std::vector<Field>& bitmap, InstructionInfo& instruction_info)
+    static void RetrieveFieldInfo(const std::vector<uint32_t>& working_dwords,
+                                  const std::vector<Field>&    bitmap,
+                                  InstructionInfo&             instruction_info,
+                                  std::vector<std::string>&    log)
     {
         // Get the fields info.
         for (const auto& field : bitmap)
@@ -210,11 +217,11 @@ namespace amdisa
                 encoding_field.bit_count   = bit_count;
                 encoding_field.bit_offset  = bit_offset;
                 encoding_field.field_name  = field.name;
-                encoding_field.field_value = GetFieldValue(field, working_dwords);
+                encoding_field.field_value = GetFieldValue(field, working_dwords, log);
             }
             else
             {
-                std::cerr << kStringErrorEmptyRange << std::endl;
+                log.push_back(kStringErrorEmptyRange);
                 assert(false);
             }
         }
@@ -308,7 +315,8 @@ namespace amdisa
     static FieldIterator GetFieldIterator(const std::vector<uint32_t>& machine_code,
                                           const std::string&           field_name,
                                           const MicrocodeFormat&       microcode_format,
-                                          uint64_t&                    field_value)
+                                          uint64_t&                    field_value,
+                                          std::vector<std::string>&    log)
     {
         FieldIterator found_field    = microcode_format.bit_map.end();
         bool          is_field_found = field_name.empty();
@@ -319,7 +327,7 @@ namespace amdisa
             if (field_iterator->name.find(field_name) != std::string::npos)
             {
                 is_field_found = true;
-                field_value    = GetFieldValue(*field_iterator, machine_code);
+                field_value    = GetFieldValue(*field_iterator, machine_code, log);
                 found_field    = field_iterator;
             }
         }
@@ -340,13 +348,12 @@ namespace amdisa
         }
         else
         {
-            std::cerr << kStringErrorEmptyOperandName << std::endl;
             assert(false);
         }
         return reg_name_formatter.str();
     }
 
-    static std::string GeneratePartitionedOperand(const amdisa::MicrocodeFormat& microcode_format, const uint32_t field_value)
+    static std::string GeneratePartitionedOperand(const amdisa::MicrocodeFormat& microcode_format, const uint32_t field_value, std::vector<std::string>& log)
     {
         std::stringstream ret;
         ret << "{ ";
@@ -357,7 +364,7 @@ namespace amdisa
         for (const auto& field : microcode_format.bit_map)
         {
             ret << field.name << ":";
-            uint64_t subvalue             = GetFieldValue(field, working_dword);
+            uint64_t subvalue             = GetFieldValue(field, working_dword, log);
             bool     has_predefined_value = false;
             if (field.predefined_values.size() > 0)
             {
@@ -384,7 +391,8 @@ namespace amdisa
     static bool ExtractModifiers(const std::vector<uint32_t>& machine_code,
                                  const Encoding&              encoding,
                                  std::vector<OperandModifer>& operand_modifiers,
-                                 std::string&                 err_message)
+                                 std::string&                 err_message,
+                                 std::vector<std::string>&    log)
     {
         bool is_success = false;
 
@@ -413,7 +421,7 @@ namespace amdisa
 
                 // Get modifier value.
                 uint64_t    modifier_value = 0;
-                const auto& field_iterator = GetFieldIterator(machine_code, modifier_name, encoding.microcode_format, modifier_value);
+                const auto& field_iterator = GetFieldIterator(machine_code, modifier_name, encoding.microcode_format, modifier_value, log);
 
                 // Save the modifier.
                 if (field_iterator != encoding.microcode_format.bit_map.end())
@@ -504,7 +512,7 @@ namespace amdisa
                 {
                     if (condition_handler.arch_conditions_.find(architecture_id) != condition_handler.arch_conditions_.end())
                     {
-                        const auto& conditions = condition_handler.arch_conditions_.at(architecture_id);
+                        const auto& conditions    = condition_handler.arch_conditions_.at(architecture_id);
                         std::string encoding_name = inst_enc_ptr->name;
                         if (encoding_name.find("ENC_") == 0)
                         {
@@ -529,7 +537,7 @@ namespace amdisa
         return found_ptrs;
     }
 
-    static void GetFunctionalGroupSubgroupInfo(InstructionInfo& info, const std::string& functional_group, std::string functional_subgroup)
+    static void GetFunctionalGroupSubgroupInfo(InstructionInfo& info, const std::string& functional_group, const std::string& functional_subgroup)
     {
         // Assign functional group enum
         if (functional_group.compare("SALU") == 0)
@@ -578,49 +586,61 @@ namespace amdisa
         }
 
         // Assign functional subgroup enum
-        if (functional_group.compare("FLOATING_POINT") == 0)
+        if (functional_subgroup.compare("FLOATING_POINT") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupFloatingPoint;
         }
-        else if (functional_group.compare("BUFFER") == 0)
+        else if (functional_subgroup.compare("BUFFER") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupBuffer;
         }
-        else if (functional_group.compare("TEXTURE") == 0)
+        else if (functional_subgroup.compare("TEXTURE") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupTexture;
         }
-        else if (functional_group.compare("LOAD") == 0)
+        else if (functional_subgroup.compare("LOAD") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupLoad;
         }
-        else if (functional_group.compare("STORE") == 0)
+        else if (functional_subgroup.compare("STORE") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupStore;
         }
-        else if (functional_group.compare("SAMPLE") == 0)
+        else if (functional_subgroup.compare("SAMPLE") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupSample;
         }
-        else if (functional_group.compare("BVH") == 0)
+        else if (functional_subgroup.compare("BVH") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupBvh;
         }
-        else if (functional_group.compare("ATOMIC") == 0)
+        else if (functional_subgroup.compare("ATOMIC") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupAtomic;
         }
-        else if (functional_group.compare("FLAT") == 0)
+        else if (functional_subgroup.compare("FLAT") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupFlat;
         }
-        else if (functional_group.compare("DATA_SHARE") == 0)
+        else if (functional_subgroup.compare("DATA_SHARE") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupDataShare;
         }
-        else if (functional_group.compare("STATIC") == 0)
+        else if (functional_subgroup.compare("STATIC") == 0)
         {
             info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupStatic;
+        }
+        else if (functional_subgroup.compare("MFMA") == 0)
+        {
+            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupMFMA;
+        }
+        else if (functional_subgroup.compare("WMMA") == 0)
+        {
+            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupWMMA;
+        }
+        else if (functional_subgroup.compare("TRANS") == 0)
+        {
+            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupTranscendental;
         }
         else
         {
@@ -737,7 +757,8 @@ namespace amdisa
                                         std::string&                                        err_message,
                                         bool                                                resolve_direct_branch_targets,
                                         const std::vector<std::string>&                     pc_to_index_map,
-                                        const std::unordered_map<std::string, std::string>& pc_to_label_map)
+                                        const std::unordered_map<std::string, std::string>& pc_to_label_map,
+                                        std::vector<std::string>&                           log)
     {
         bool is_success = true;
 
@@ -836,7 +857,9 @@ namespace amdisa
                     ErrorInstructionBundle.bundle.push_back(ErrorInstructionInfo);
                 }
 
-                std::cerr << kStringErrorShaderTextDecodeFailed << std::endl;
+                std::stringstream err_ss;
+                err_ss << kStringErrorShaderTextDecodeFailed << "(" << inst << ")";
+                log.push_back(err_ss.str());
             }
         }
 
@@ -935,7 +958,7 @@ namespace amdisa
             {
                 if (identifier_to_instruction_[identifier]->name != instr_ptr->name)
                 {
-                    std::cout << "Warning: Id is mapping to the same instruction." << std::endl;
+                    log_.push_back(kStringWarningApiInitSameMappingInst);
                 }
             }
         }
@@ -949,8 +972,7 @@ namespace amdisa
         {
             auto&       instr_enc_vec  = identifier_to_instruction_encoding_vec_[identifier];
             const auto& instr_enc_iter = std::find_if(instr_enc_vec.begin(), instr_enc_vec.end(), [&](std::shared_ptr<InstructionEncoding> pushed_instr_enc) {
-                return (pushed_instr_enc->name == instr_enc_ptr->name)
-                    && (pushed_instr_enc->condition_name == instr_enc_ptr->condition_name);
+                return (pushed_instr_enc->name == instr_enc_ptr->name) && (pushed_instr_enc->condition_name == instr_enc_ptr->condition_name);
             });
             if (instr_enc_iter == instr_enc_vec.end())
             {
@@ -958,7 +980,7 @@ namespace amdisa
             }
             else if ((instr_enc_ptr->name.find("VOPD") == std::string::npos) && (instr_enc_ptr->name.find("FLAT") == std::string::npos))
             {
-                std::cout << "Warning: Id is mapping the same instruction encoding." << std::endl;
+                log_.push_back(kStringWarningApiInitSameMappingEnc);
             }
         }
 
@@ -970,6 +992,11 @@ namespace amdisa
         EncodingConditionHandler& GetEncodingConditionHandler()
         {
             return condition_handler_;
+        }
+
+        std::vector<std::string>& GetLog()
+        {
+            return log_;
         }
 
     private:
@@ -991,6 +1018,9 @@ namespace amdisa
         // Encoding conditions handler. The class contains functions that are needed for runtime
         // evaluation of encodings. For example, should we pick an encoding with literal, dpp or sdwa.
         EncodingConditionHandler condition_handler_;
+
+        // Log messages that should be communicated from API which are not errors.
+        std::vector<std::string> log_;
     };
 
     bool IsaDecoder::Initialize(const std::string& input_xml_file_path, std::string& err_message)
@@ -1021,34 +1051,28 @@ namespace amdisa
             api_impl_->SetInitialized(is_xml_read_successful);
         }
 
-        // Check version.
+        // Check compatibility.
+        bool is_compatible = false;
         if (is_xml_read_successful)
         {
-            std::string& xml_schema_version = api_impl_->GetSpec().info.schema_version;
-            if (xml_schema_version > kMaxSupportedSchemaVersion)
-            {
-                is_xml_read_successful = false;
-                std::stringstream err_stream;
-                err_stream << kStringErrorUnsupportedXml << " ";
-                err_stream << "Version of XML being read: " << xml_schema_version << ". ";
-                err_stream << "API supports version " << kMaxSupportedSchemaVersion << " and lower.";
-                err_message = err_stream.str();
-            }
+            const std::string& xml_schema_version = api_impl_->GetSpec().info.schema_version;
+            is_compatible                         = amdisa::ApiVersion::IsCompatible(xml_schema_version, err_message);
         }
 
-        if (is_xml_read_successful)
+        if (is_xml_read_successful && is_compatible)
         {
             const IsaSpec& spec_data = api_impl_->GetSpec();
-            
+
             // Map identifiers to encodings.
             for (const Encoding& encoding : spec_data.encodings)
             {
-                if (encoding.bit_count <= 64)
+                for (uint64_t identifier : encoding.identifiers)
                 {
-                    for (uint64_t identifier : encoding.identifiers)
-                    {
-                        api_impl_->MapIdentifierToEncoding(identifier, std::make_shared<Encoding>(encoding));
-                    }
+                    // Identifier mask is the mask of the encoding fields and the opcode fields.
+                    // Everything else can be safely masked out for this mapping.
+                    uint64_t identifier_mask = (encoding.mask | encoding.opcode_mask | encoding.seg_mask);
+                    identifier               = identifier & identifier_mask;
+                    api_impl_->MapIdentifierToEncoding(identifier, std::make_shared<Encoding>(encoding));
                 }
             }
 
@@ -1059,8 +1083,8 @@ namespace amdisa
                 {
                     const InstructionEncoding& instruction_encoding = instruction.encodings[encoding_itr];
                     // VOPD handling, determine if x or y layout.
-                    bool is_x_layout = IsOperandPresent(instruction_encoding, "SRCX0");
-                    bool is_y_layout = IsOperandPresent(instruction_encoding, "SRCY0");
+                    bool is_x_layout = IsOperandPresent(instruction_encoding, "VDSTX");
+                    bool is_y_layout = IsOperandPresent(instruction_encoding, "VDSTY");
 
                     // Form encoding identifier.
                     const auto& found_encoding_iterator = std::find_if(spec_data.encodings.begin(), spec_data.encodings.end(), [&](const Encoding& encoding) {
@@ -1089,7 +1113,10 @@ namespace amdisa
                         }
                         else
                         {
-                            const uint64_t positioned_op = static_cast<uint64_t>(instruction_encoding.opcode) << range.bit_offset;
+                            // Specified opcode value can be larger than allocated bits in the encoding.
+                            // The most significant bits can be masked out.
+                            uint64_t       opcode_mask   = (1ULL << range.bit_count) - 1;
+                            const uint64_t positioned_op = static_cast<uint64_t>(instruction_encoding.opcode & opcode_mask) << range.bit_offset;
                             identifier |= positioned_op;
                             if (is_seg_found)
                             {
@@ -1109,7 +1136,7 @@ namespace amdisa
                                 }
                                 else
                                 {
-                                    std::cout << "Warning: Marked with SEG field, but doesn't match with constants." << std::endl;
+                                    api_impl_->GetLog().push_back(kStringWarningSegBits);
                                 }
                             }
                         }
@@ -1154,7 +1181,7 @@ namespace amdisa
             }
         }
 
-        return is_xml_read_successful && (api_impl_ != nullptr);
+        return is_xml_read_successful && is_compatible && (api_impl_ != nullptr);
     }
 
     std::string IsaDecoder::GetVersion() const
@@ -1186,8 +1213,14 @@ namespace amdisa
         // Decode the extracted instructions
         if (is_success)
         {
-            is_success = DecodeShaderDisassembly(
-                this, disassembly_text, instruction_info_stream, err_message, resolve_direct_branch_targets, pc_to_index_map, pc_to_label_map);
+            is_success = DecodeShaderDisassembly(this,
+                                                 disassembly_text,
+                                                 instruction_info_stream,
+                                                 err_message,
+                                                 resolve_direct_branch_targets,
+                                                 pc_to_index_map,
+                                                 pc_to_label_map,
+                                                 api_impl_->GetLog());
         }
         return is_success;
     }
@@ -1240,8 +1273,14 @@ namespace amdisa
         // Decode the extracted instructions
         if (is_success)
         {
-            is_success = DecodeShaderDisassembly(
-                this, shader_disassembly_text, instruction_info_stream, err_message, resolve_direct_branch_targets, pc_to_index_map, pc_to_label_map);
+            is_success = DecodeShaderDisassembly(this,
+                                                 shader_disassembly_text,
+                                                 instruction_info_stream,
+                                                 err_message,
+                                                 resolve_direct_branch_targets,
+                                                 pc_to_index_map,
+                                                 pc_to_label_map,
+                                                 api_impl_->GetLog());
         }
         return is_success;
     }
@@ -1270,7 +1309,7 @@ namespace amdisa
             {
                 // Get words from the machine code stream for the current instruction.
                 working_dwords.clear();
-                working_dwords.push_back(stream.GetNextDword());
+                working_dwords.push_back(stream.GetNextDword(api_impl_->GetLog()));
 
                 // Get the encoding.
                 auto encoding_ptr = GetEncodingIterator(api_impl_->GetEncodingMap(), working_dwords[0], spec_data);
@@ -1284,7 +1323,7 @@ namespace amdisa
                     // Get next dword from instruction stream for wider encodings.
                     while (working_dwords.size() * 32 < encoding_ptr->bit_count)
                     {
-                        working_dwords.push_back(stream.GetNextDword());
+                        working_dwords.push_back(stream.GetNextDword(api_impl_->GetLog()));
                     }
 
                     // VOPD encoding requires special handling due to two opcodes.
@@ -1332,8 +1371,9 @@ namespace amdisa
                         --opcode_count;
 
                         // Get the opcode.
-                        uint64_t    opcode_value   = 0;
-                        const auto& field_iterator = GetFieldIterator(working_dwords, opcode_field_name, encoding_ptr->microcode_format, opcode_value);
+                        uint64_t    opcode_value = 0;
+                        const auto& field_iterator =
+                            GetFieldIterator(working_dwords, opcode_field_name, encoding_ptr->microcode_format, opcode_value, api_impl_->GetLog());
 
                         // EXP encoding has no OP field.
                         bool is_exp                  = encoding_ptr->name.find("EXP") != std::string::npos;
@@ -1346,11 +1386,12 @@ namespace amdisa
                             auto& instruction_info = instruction_info_bundle.bundle.back();
 
                             // Get the modifiers.
-                            bool is_extracted = ExtractModifiers(working_dwords, *encoding_ptr, instruction_info.operand_modifiers, err_message);
+                            bool is_extracted =
+                                ExtractModifiers(working_dwords, *encoding_ptr, instruction_info.operand_modifiers, err_message, api_impl_->GetLog());
                             if (is_extracted)
                             {
                                 // Get the fields info into the container.
-                                RetrieveFieldInfo(working_dwords, encoding_ptr->microcode_format.bit_map, instruction_info);
+                                RetrieveFieldInfo(working_dwords, encoding_ptr->microcode_format.bit_map, instruction_info, api_impl_->GetLog());
                                 uint32_t second_dword = 0;
                                 if (working_dwords.size() > 1)
                                 {
@@ -1366,318 +1407,333 @@ namespace amdisa
                                                                                   is_vopdx,
                                                                                   is_vopdy);
 
-                                // Get the conditional encoding.
-                                if (encoding_ptr->name != instruction_ptrs.instruction_encoding_ptr->name)
-                                {
-                                    const auto& encoding_iter = std::find_if(spec_data.encodings.begin(), spec_data.encodings.end(), [&](const Encoding& encoding) {
-                                        return encoding.name == instruction_ptrs.instruction_encoding_ptr->name;
-                                    });
-                                    assert(encoding_iter != spec_data.encodings.end());
-                                    encoding_ptr = std::make_shared<Encoding>(*encoding_iter);
-
-                                    // Retrieve all required dwords from the instruction stream.
-                                    while (working_dwords.size() * 32 < encoding_ptr->bit_count)
-                                    {
-                                        working_dwords.push_back(stream.GetNextDword());
-                                    }
-                                }
-
-                                // Encoding info retrieve successfully -- save return values.
-                                instruction_info.encoding_description = encoding_ptr->description;
-                                instruction_info.encoding_name = encoding_ptr->name;
-
-                                // Get the fields info in a formated single string for printing.
-                                amdisa::AmdIsaUtility::BitMapToString(encoding_ptr->microcode_format, working_dwords, instruction_info.encoding_layout);
-
-                                // Find the instruction.
-                                bool is_instruction_retrieval_successful =
+                                bool are_pointers_retrieved =
                                     instruction_ptrs.instruction_encoding_ptr != nullptr && instruction_ptrs.instruction_ptr != nullptr;
-
-                                if (is_instruction_retrieval_successful)
+                                assert(are_pointers_retrieved);
+                                if (are_pointers_retrieved)
                                 {
-                                    // Dereference pointers for local use.
-                                    const InstructionEncoding& inst_enc = *(instruction_ptrs.instruction_encoding_ptr);
-                                    const Instruction&         inst     = *(instruction_ptrs.instruction_ptr);
-
-                                    // Instruction info retrieved successfully -- save return values.
-                                    instruction_info.instruction_name                                     = inst.name;
-                                    instruction_info.aliased_names                                        = inst.aliased_names;
-                                    instruction_info.instruction_semantic_info.branch_info.is_branch      = inst.is_branch;
-                                    instruction_info.instruction_semantic_info.branch_info.is_conditional = inst.is_conditional_branch;
-                                    instruction_info.instruction_semantic_info.branch_info.is_indirect    = inst.is_indirect_branch;
-                                    instruction_info.instruction_semantic_info.is_immediately_executed    = inst.is_immediately_executed;
-                                    instruction_info.instruction_semantic_info.is_program_terminator      = inst.is_program_terminator;
-                                    instruction_info.instruction_description                              = inst.description;
-
-                                    // Get Functional Group and Subgroup Information
-                                    GetFunctionalGroupSubgroupInfo(instruction_info, inst.functional_group_name, inst.functional_subgroup_name);
-
-                                    // Get Functional Group Description
-                                    instruction_info.functional_group_subgroup_info.description = "Functional group description not found!";
-                                    for (auto group_itr = spec_data.functional_group_info.begin(); group_itr != spec_data.functional_group_info.end();
-                                         ++group_itr)
+                                    // Get the conditional encoding.
+                                    if (encoding_ptr->name != instruction_ptrs.instruction_encoding_ptr->name)
                                     {
-                                        if (group_itr->name.compare(inst.functional_group_name) == 0)
+                                        const auto& encoding_iter =
+                                            std::find_if(spec_data.encodings.begin(), spec_data.encodings.end(), [&](const Encoding& encoding) {
+                                                return encoding.name == instruction_ptrs.instruction_encoding_ptr->name;
+                                            });
+                                        assert(encoding_iter != spec_data.encodings.end());
+                                        encoding_ptr = std::make_shared<Encoding>(*encoding_iter);
+
+                                        // Retrieve all required dwords from the instruction stream.
+                                        while (working_dwords.size() * 32 < encoding_ptr->bit_count)
                                         {
-                                            instruction_info.functional_group_subgroup_info.description = group_itr->desc;
-                                            break;
+                                            working_dwords.push_back(stream.GetNextDword(api_impl_->GetLog()));
                                         }
                                     }
 
-                                    // Get the operands.
-                                    Encoding encoding = *encoding_ptr;
-                                    for (auto operands_iterator = inst_enc.operands.begin(); !is_decode_failed && operands_iterator != inst_enc.operands.end();
-                                         ++operands_iterator)
+                                    // Encoding info retrieve successfully -- save return values.
+                                    instruction_info.encoding_description = encoding_ptr->description;
+                                    instruction_info.encoding_name        = encoding_ptr->name;
+
+                                    // Get the fields info in a formated single string for printing.
+                                    amdisa::AmdIsaUtility::BitMapToString(encoding_ptr->microcode_format, working_dwords, instruction_info.encoding_layout);
+
+                                    // Find the instruction.
+                                    bool is_instruction_retrieval_successful =
+                                        instruction_ptrs.instruction_encoding_ptr != nullptr && instruction_ptrs.instruction_ptr != nullptr;
+
+                                    if (is_instruction_retrieval_successful)
                                     {
-                                        // Dereference the iterator.
-                                        const auto& operand = *operands_iterator;
+                                        // Dereference pointers for local use.
+                                        const InstructionEncoding& inst_enc = *(instruction_ptrs.instruction_encoding_ptr);
+                                        const Instruction&         inst     = *(instruction_ptrs.instruction_ptr);
 
-                                        // No need to process implicit operands as they are not in the
-                                        // machine code.
-                                        if (!operand.is_implicit)
+                                        // Instruction info retrieved successfully -- save return values.
+                                        instruction_info.instruction_name                                     = inst.name;
+                                        instruction_info.aliased_names                                        = inst.aliased_names;
+                                        instruction_info.instruction_semantic_info.branch_info.is_branch      = inst.is_branch;
+                                        instruction_info.instruction_semantic_info.branch_info.is_conditional = inst.is_conditional_branch;
+                                        instruction_info.instruction_semantic_info.branch_info.is_indirect    = inst.is_indirect_branch;
+                                        instruction_info.instruction_semantic_info.is_immediately_executed    = inst.is_immediately_executed;
+                                        instruction_info.instruction_semantic_info.is_program_terminator      = inst.is_program_terminator;
+                                        instruction_info.instruction_description                              = inst.description;
+
+                                        // Get Functional Group and Subgroup Information
+                                        GetFunctionalGroupSubgroupInfo(instruction_info, inst.functional_group_name, inst.functional_subgroup_name);
+
+                                        // Get Functional Group Description
+                                        instruction_info.functional_group_subgroup_info.description = "Functional group description not found!";
+                                        for (auto group_itr = spec_data.functional_group_info.begin(); group_itr != spec_data.functional_group_info.end();
+                                             ++group_itr)
                                         {
-                                            std::string field_name = operand.encoding_field_name;
-
-                                            // Convert field name to upper case.
-                                            field_name = AmdIsaUtility::ToUpper(field_name);
-
-                                            bool is_implied_literal = false;
-                                            if (encoding.name.find("LITERAL") != std::string::npos && field_name.empty())
+                                            if (group_itr->name.compare(inst.functional_group_name) == 0)
                                             {
-                                                field_name         = "SIMM32";
-                                                is_implied_literal = true;
+                                                instruction_info.functional_group_subgroup_info.description = group_itr->desc;
+                                                break;
                                             }
+                                        }
 
-                                            // Get the value of the field.
-                                            uint64_t    field_value    = 0;
-                                            const auto& field_iterator = GetFieldIterator(working_dwords, field_name, encoding.microcode_format, field_value);
-                                            bool        is_field_found = field_iterator != encoding.microcode_format.bit_map.end();
+                                        // Get the operands.
+                                        Encoding encoding = *encoding_ptr;
+                                        for (auto operands_iterator = inst_enc.operands.begin();
+                                             !is_decode_failed && operands_iterator != inst_enc.operands.end();
+                                             ++operands_iterator)
+                                        {
+                                            // Dereference the iterator.
+                                            const auto& operand = *operands_iterator;
 
-                                            // Known cases when the field name may not be present in the
-                                            // encoding.
-                                            bool is_operand_literal = false;
-                                            if (!is_field_found)
+                                            // No need to process implicit operands as they are not in the
+                                            // machine code.
+                                            if (!operand.is_implicit)
                                             {
-                                                if (field_name == "LITERAL")
+                                                std::string field_name = operand.encoding_field_name;
+
+                                                // Convert field name to upper case.
+                                                field_name = AmdIsaUtility::ToUpper(field_name);
+
+                                                bool is_implied_literal = false;
+                                                if (encoding.name.find("LITERAL") != std::string::npos && field_name.empty())
                                                 {
-                                                    is_field_found     = true;
-                                                    is_operand_literal = true;
+                                                    field_name         = "SIMM32";
+                                                    is_implied_literal = true;
                                                 }
-                                                else if (!operand.is_in_microcode)
+
+                                                // Get the value of the field.
+                                                uint64_t    field_value = 0;
+                                                const auto& field_iterator =
+                                                    GetFieldIterator(working_dwords, field_name, encoding.microcode_format, field_value, api_impl_->GetLog());
+                                                bool is_field_found = field_iterator != encoding.microcode_format.bit_map.end();
+
+                                                // Known cases when the field name may not be present in the
+                                                // encoding.
+                                                bool is_operand_literal = false;
+                                                if (!is_field_found)
                                                 {
-                                                    is_field_found = true;
-                                                }
-                                                else
-                                                {
-                                                    assert(false);
-                                                }
-                                            }
-
-                                            // Get the operand type.
-                                            const auto& operand_type_iterator = std::find_if(
-                                                spec_data.operand_types.begin(), spec_data.operand_types.end(), [&](const OperandType& operand_type) {
-                                                    return operand_type.name == operand.type;
-                                                });
-
-                                            bool is_operand_retrieval_successful = is_field_found && operand_type_iterator != spec_data.operand_types.end();
-
-                                            // Get the operand names.
-                                            if (is_operand_retrieval_successful)
-                                            {
-                                                instruction_info.instruction_operands.push_back(InstructionOperand());
-                                                auto& instruction_operand        = instruction_info.instruction_operands.back();
-                                                instruction_operand.is_input     = operand.input;
-                                                instruction_operand.is_output    = operand.output;
-                                                instruction_operand.operand_size = operand.size;
-
-                                                const auto& predefined_value_iterator = std::find_if(
-                                                    operand_type_iterator->predefined_values.begin(),
-                                                    operand_type_iterator->predefined_values.end(),
-                                                    [&](const PredefinedValue& predefined_value) { return predefined_value.value == field_value; });
-
-                                                // Save branch offset if branch.
-                                                if (instruction_info.instruction_semantic_info.branch_info.is_branch)
-                                                {
-                                                    if (instruction_info.instruction_semantic_info.branch_info.IsDirect())
+                                                    if (field_name == "LITERAL")
                                                     {
-                                                        instruction_info.instruction_semantic_info.branch_info.branch_offset =
-                                                            static_cast<int16_t>(field_value);
+                                                        is_field_found     = true;
+                                                        is_operand_literal = true;
+                                                    }
+                                                    else if (!operand.is_in_microcode)
+                                                    {
+                                                        is_field_found = true;
+                                                    }
+                                                    else
+                                                    {
+                                                        assert(false);
                                                     }
                                                 }
 
-                                                if (field_name.find("SIMM") == 0 && encoding.name.find("LITERAL") != std::string::npos)
+                                                // Get the operand type.
+                                                const auto& operand_type_iterator = std::find_if(
+                                                    spec_data.operand_types.begin(), spec_data.operand_types.end(), [&](const OperandType& operand_type) {
+                                                        return operand_type.name == operand.type;
+                                                    });
+
+                                                bool is_operand_retrieval_successful = is_field_found && operand_type_iterator != spec_data.operand_types.end();
+
+                                                // Get the operand names.
+                                                if (is_operand_retrieval_successful)
                                                 {
-                                                    std::stringstream formatter;
-                                                    formatter << std::hex << "lit(0x" << field_value << ")";
-                                                    instruction_operand.operand_name = formatter.str();
-                                                }
-                                                else if (predefined_value_iterator != operand_type_iterator->predefined_values.end())
-                                                {
-                                                    if (!predefined_value_iterator->name.empty())
+                                                    instruction_info.instruction_operands.push_back(InstructionOperand());
+                                                    auto& instruction_operand        = instruction_info.instruction_operands.back();
+                                                    instruction_operand.is_input     = operand.input;
+                                                    instruction_operand.is_output    = operand.output;
+                                                    instruction_operand.operand_size = operand.size;
+
+                                                    const auto& predefined_value_iterator = std::find_if(
+                                                        operand_type_iterator->predefined_values.begin(),
+                                                        operand_type_iterator->predefined_values.end(),
+                                                        [&](const PredefinedValue& predefined_value) { return predefined_value.value == field_value; });
+
+                                                    // Save branch offset if branch.
+                                                    if (instruction_info.instruction_semantic_info.branch_info.is_branch)
                                                     {
-                                                        // Get operand name. Expand the name to range format if operand size
-                                                        // is greater than 32 bits.
-                                                        const std::string operand_name   = predefined_value_iterator->name;
-                                                        instruction_operand.operand_name = operand_name;
-                                                        if (operand_name.length() > 1)
+                                                        if (instruction_info.instruction_semantic_info.branch_info.IsDirect())
                                                         {
-                                                            const bool is_size_wave_dependent = (operand.data_format == kWaveDependentFormat) ||
-                                                                                                (is_mubuf_encoding && operand.encoding_field_name == "VADDR");
-                                                            const bool is_next_digit = std::isdigit(static_cast<uint8_t>(operand_name[1]));
-                                                            const bool is_sgpr       = (operand_name[0] == 's') && (is_next_digit);
-                                                            const bool is_vgpr       = (operand_name[0] == 'v') && (is_next_digit);
-                                                            if (!is_size_wave_dependent && (instruction_operand.operand_size > kDwordSize) &&
-                                                                (is_sgpr || is_vgpr))
+                                                            instruction_info.instruction_semantic_info.branch_info.branch_offset =
+                                                                static_cast<int16_t>(field_value);
+                                                        }
+                                                    }
+
+                                                    if (field_name.find("SIMM") == 0 && encoding.name.find("LITERAL") != std::string::npos)
+                                                    {
+                                                        std::stringstream formatter;
+                                                        formatter << std::hex << "lit(0x" << field_value << ")";
+                                                        instruction_operand.operand_name = formatter.str();
+                                                    }
+                                                    else if (predefined_value_iterator != operand_type_iterator->predefined_values.end())
+                                                    {
+                                                        if (!predefined_value_iterator->name.empty())
+                                                        {
+                                                            // Get operand name. Expand the name to range format if operand size
+                                                            // is greater than 32 bits.
+                                                            const std::string operand_name   = predefined_value_iterator->name;
+                                                            instruction_operand.operand_name = operand_name;
+                                                            if (operand_name.length() > 1)
                                                             {
-                                                                instruction_operand.operand_name =
-                                                                    GetNameAsRegisterRange(operand_name, instruction_operand.operand_size);
+                                                                const bool is_size_wave_dependent =
+                                                                    (operand.data_format == kWaveDependentFormat) ||
+                                                                    (is_mubuf_encoding && operand.encoding_field_name == "VADDR");
+                                                                const bool is_next_digit = std::isdigit(static_cast<uint8_t>(operand_name[1]));
+                                                                const bool is_sgpr       = (operand_name[0] == 's') && (is_next_digit);
+                                                                const bool is_vgpr       = (operand_name[0] == 'v') && (is_next_digit);
+                                                                if (!is_size_wave_dependent && (instruction_operand.operand_size > kDwordSize) &&
+                                                                    (is_sgpr || is_vgpr))
+                                                                {
+                                                                    instruction_operand.operand_name =
+                                                                        GetNameAsRegisterRange(operand_name, instruction_operand.operand_size);
+                                                                }
+                                                            }
+                                                            // Add constant offset modifier for SMEM encoding instructions.
+                                                            if ((is_smem_encoding || is_mubuf_encoding) && field_name == "SOFFSET")
+                                                            {
+                                                                uint64_t    const_offset   = 0;
+                                                                const auto& field_iterator = GetFieldIterator(
+                                                                    working_dwords, "OFFSET", encoding.microcode_format, const_offset, api_impl_->GetLog());
+                                                                if (const_offset > 0)
+                                                                {
+                                                                    std::stringstream formatter;
+                                                                    formatter << predefined_value_iterator->name << " offset:0x" << std::hex << const_offset;
+                                                                    instruction_operand.operand_name = formatter.str();
+                                                                }
                                                             }
                                                         }
-                                                        // Add constant offset modifier for SMEM encoding instructions.
-                                                        if ((is_smem_encoding || is_mubuf_encoding) && field_name == "SOFFSET")
+                                                        else
                                                         {
-                                                            uint64_t    const_offset = 0;
-                                                            const auto& field_iterator =
-                                                                GetFieldIterator(working_dwords, "OFFSET", encoding.microcode_format, const_offset);
-                                                            if (const_offset > 0)
-                                                            {
-                                                                std::stringstream formatter;
-                                                                formatter << predefined_value_iterator->name << " offset:0x" << std::hex << const_offset;
-                                                                instruction_operand.operand_name = formatter.str();
-                                                            }
+                                                            instruction_operand.operand_name = std::to_string(predefined_value_iterator->value);
+                                                        }
+                                                    }
+                                                    else if (operand.type.find("VCC") != std::string::npos)
+                                                    {
+                                                        instruction_operand.operand_name = "vcc";
+                                                    }
+                                                    else if (operand.type.find("EXEC") != std::string::npos)
+                                                    {
+                                                        instruction_operand.operand_name = "exec";
+                                                    }
+                                                    else if (operand_type_iterator->is_partitioned)
+                                                    {
+                                                        assert(field_value <= UINT32_MAX);
+                                                        instruction_operand.operand_name = GeneratePartitionedOperand(
+                                                            operand_type_iterator->microcode_format, static_cast<uint32_t>(field_value), api_impl_->GetLog());
+                                                        if (is_implied_literal)
+                                                        {
+                                                            is_prev_operand_lit   = true;
+                                                            prev_lit_operand_name = instruction_operand.operand_name;
                                                         }
                                                     }
                                                     else
                                                     {
-                                                        instruction_operand.operand_name = std::to_string(predefined_value_iterator->value);
+                                                        // Return raw bit value if no predefined values were
+                                                        if (!is_operand_literal)
+                                                        {
+                                                            std::stringstream formatter;
+                                                            formatter << std::hex << "0x" << field_value;
+                                                            instruction_operand.operand_name = formatter.str();
+                                                        }
                                                     }
-                                                }
-                                                else if (operand.type.find("VCC") != std::string::npos)
-                                                {
-                                                    instruction_operand.operand_name = "vcc";
-                                                }
-                                                else if (operand.type.find("EXEC") != std::string::npos)
-                                                {
-                                                    instruction_operand.operand_name = "exec";
-                                                }
-                                                else if (operand_type_iterator->is_partitioned)
-                                                {
-                                                    assert(field_value <= UINT32_MAX);
-                                                    instruction_operand.operand_name =
-                                                        GeneratePartitionedOperand(operand_type_iterator->microcode_format, static_cast<uint32_t>(field_value));
-                                                    if (is_implied_literal)
+
+                                                    // Handle  the implied literal case and the source literal case.
+                                                    if (is_operand_literal || instruction_operand.operand_name == "src_literal")
                                                     {
-                                                        is_prev_operand_lit   = true;
-                                                        prev_lit_operand_name = instruction_operand.operand_name;
+                                                        if (!is_operand_literal)
+                                                        {
+                                                            assert(field_value == 255);
+                                                        }
+                                                        if (is_vopd_encoding && opcode_count == 0 && is_prev_operand_lit)
+                                                        {
+                                                            instruction_operand.operand_name = prev_lit_operand_name;
+
+                                                            // Set to false since the second iteration of decoding
+                                                            // dual operations type instructions is complete.
+                                                            // opcode_count == 0
+                                                            is_prev_operand_lit = false;
+                                                        }
+                                                        else
+                                                        {
+                                                            std::stringstream formatter;
+                                                            uint32_t          lit = working_dwords[working_dwords.size() - 1];
+                                                            if (encoding.name.find("LITERAL") == std::string::npos)
+                                                            {
+                                                                lit = stream.GetNextDword(api_impl_->GetLog());
+                                                            }
+                                                            formatter << "lit(0x" << std::hex << lit << ")";
+                                                            instruction_operand.operand_name = formatter.str();
+                                                            is_prev_operand_lit              = true;
+                                                            prev_lit_operand_name            = instruction_operand.operand_name;
+                                                        }
                                                     }
                                                 }
                                                 else
                                                 {
-                                                    // Return raw bit value if no predefined values were
-                                                    if (!is_operand_literal)
-                                                    {
-                                                        std::stringstream formatter;
-                                                        formatter << std::hex << "0x" << field_value;
-                                                        instruction_operand.operand_name = formatter.str();
-                                                    }
-                                                }
-
-                                                // Handle  the implied literal case and the source literal case.
-                                                if (is_operand_literal || instruction_operand.operand_name == "src_literal")
-                                                {
-                                                    if (!is_operand_literal)
-                                                    {
-                                                        assert(field_value == 255);
-                                                    }
-                                                    if (is_vopd_encoding && opcode_count == 0 && is_prev_operand_lit)
-                                                    {
-                                                        instruction_operand.operand_name = prev_lit_operand_name;
-
-                                                        // Set to false since the second iteration of decoding
-                                                        // dual operations type instructions is complete.
-                                                        // opcode_count == 0
-                                                        is_prev_operand_lit = false;
-                                                    }
-                                                    else
-                                                    {
-                                                        std::stringstream formatter;
-                                                        uint32_t lit = working_dwords[working_dwords.size() - 1];
-                                                        if (encoding.name.find("LITERAL") == std::string::npos)
-                                                        {
-                                                            lit = stream.GetNextDword();
-                                                        }
-                                                        formatter << "lit(0x" << std::hex << lit << ")";
-                                                        instruction_operand.operand_name = formatter.str();
-                                                        is_prev_operand_lit              = true;
-                                                        prev_lit_operand_name            = instruction_operand.operand_name;
-                                                    }
+                                                    is_decode_failed = true;
+                                                    err_message      = kStringErrorFailedToDecodeOperands;
                                                 }
                                             }
-                                            else
+                                        }
+                                    }
+                                    else
+                                    {
+                                        is_decode_failed = true;
+                                        std::stringstream err_stream;
+                                        err_stream << kStringErrorInstructionNotFoundInSpec;
+                                        if (instruction_ptrs.instruction_encoding_ptr == nullptr)
+                                        {
+                                            err_stream << " " << kStringErrorEncodingNotFound;
+                                        }
+                                        err_stream << kStringErrorEncodingNotFound;
+                                        for (const auto& kDword : working_dwords)
+                                        {
+                                            err_stream << std::hex << "0x" << kDword << " ";
+                                        }
+                                        err_message = err_stream.str();
+                                    }
+
+                                    // Apply modifiers on the assembly operands.
+                                    uint32_t neg_modifier_value = 0;
+                                    uint32_t abs_modifier_value = 0;
+                                    uint32_t offset_value       = 0;
+                                    for (const auto& operand_modifier : instruction_info.operand_modifiers)
+                                    {
+                                        // Negation.
+                                        if (operand_modifier.modifier_name.find(kModifierNameNegation) != std::string::npos)
+                                        {
+                                            neg_modifier_value = operand_modifier.value;
+                                        }
+                                        else if (operand_modifier.modifier_name.find(kModifierNameAbsoluteValue) != std::string::npos)
+                                        {
+                                            abs_modifier_value = operand_modifier.value;
+                                        }
+                                        else if (operand_modifier.modifier_name.find(kModifierNameOffset) != std::string::npos)
+                                        {
+                                            offset_value = operand_modifier.value;
+                                        }
+                                    }
+
+                                    uint32_t check_bit_pos = 1;
+                                    for (uint32_t i = 0; i < instruction_info.instruction_operands.size(); i++)
+                                    {
+                                        InstructionOperand& current_operand = instruction_info.instruction_operands[i];
+                                        if (current_operand.is_input)
+                                        {
+                                            bool is_neg_bit_set = (neg_modifier_value & check_bit_pos) > 0;
+                                            bool is_abs_bit_set = (abs_modifier_value & check_bit_pos) > 0;
+                                            if (is_neg_bit_set)
                                             {
-                                                is_decode_failed = true;
-                                                err_message      = kStringErrorFailedToDecodeOperands;
+                                                current_operand.operand_name = "-" + current_operand.operand_name;
                                             }
+                                            if (is_abs_bit_set)
+                                            {
+                                                current_operand.operand_name = "abs(" + current_operand.operand_name + ")";
+                                            }
+
+                                            check_bit_pos <<= 1;
                                         }
                                     }
                                 }
                                 else
                                 {
                                     is_decode_failed = true;
-                                    std::stringstream err_stream;
-                                    err_stream << kStringErrorInstructionNotFoundInSpec;
-                                    if (instruction_ptrs.instruction_encoding_ptr == nullptr)
-                                    {
-                                        err_stream << " " << kStringErrorEncodingNotFound;
-                                    }
-                                    err_stream << kStringErrorEncodingNotFound;
-                                    for (const auto& kDword : working_dwords)
-                                    {
-                                        err_stream << std::hex << "0x" << kDword << " ";
-                                    }
-                                    err_message = err_stream.str();
-                                }
-
-                                // Apply modifiers on the assembly operands.
-                                uint32_t neg_modifier_value = 0;
-                                uint32_t abs_modifier_value = 0;
-                                uint32_t offset_value       = 0;
-                                for (const auto& operand_modifier : instruction_info.operand_modifiers)
-                                {
-                                    // Negation.
-                                    if (operand_modifier.modifier_name.find(kModifierNameNegation) != std::string::npos)
-                                    {
-                                        neg_modifier_value = operand_modifier.value;
-                                    }
-                                    else if (operand_modifier.modifier_name.find(kModifierNameAbsoluteValue) != std::string::npos)
-                                    {
-                                        abs_modifier_value = operand_modifier.value;
-                                    }
-                                    else if (operand_modifier.modifier_name.find(kModifierNameOffset) != std::string::npos)
-                                    {
-                                        offset_value = operand_modifier.value;
-                                    }
-                                }
-
-                                uint32_t check_bit_pos = 1;
-                                for (uint32_t i = 0; i < instruction_info.instruction_operands.size(); i++)
-                                {
-                                    InstructionOperand& current_operand = instruction_info.instruction_operands[i];
-                                    if (current_operand.is_input)
-                                    {
-                                        bool is_neg_bit_set = (neg_modifier_value & check_bit_pos) > 0;
-                                        bool is_abs_bit_set = (abs_modifier_value & check_bit_pos) > 0;
-                                        if (is_neg_bit_set)
-                                        {
-                                            current_operand.operand_name = "-" + current_operand.operand_name;
-                                        }
-                                        if (is_abs_bit_set)
-                                        {
-                                            current_operand.operand_name = "abs(" + current_operand.operand_name + ")";
-                                        }
-
-                                        check_bit_pos <<= 1;
-                                    }
+                                    err_message      = kStringErrorEncodingIdentifiersNotFound;
                                 }
                             }
                             else
@@ -1795,10 +1851,15 @@ namespace amdisa
         return !is_retrieval_failed;
     }
 
+    std::vector<std::string> IsaDecoder::GetDebugLog() const
+    {
+        return api_impl_->GetLog();
+    }
+
     GpuArchitecture IsaDecoder::GetArchitecture() const
     {
-        GpuArchitecture ret = GpuArchitecture::kUnknown;
-        auto arch_enum_iter = kArchitectureIdToEnum.find(api_impl_->GetSpec().architecture.id);
+        GpuArchitecture ret            = GpuArchitecture::kUnknown;
+        auto            arch_enum_iter = kArchitectureIdToEnum.find(api_impl_->GetSpec().architecture.id);
         if (arch_enum_iter != kArchitectureIdToEnum.end())
         {
             ret = arch_enum_iter->second;

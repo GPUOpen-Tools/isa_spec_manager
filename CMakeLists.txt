@@ -5,9 +5,11 @@ cmake_minimum_required(VERSION 3.0)
 project(isa_spec_manager)
 
 # Setting compiler flags.
-set (CMAKE_CXX_COMPILER g++)
-set (CMAKE_CXX_STANDARD 14)
-set (CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${FLAGS})
+if (LINUX)
+    set(CMAKE_CXX_COMPILER g++)
+endif ()
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${FLAGS})
 
 # Enable using folders to group projects on Windows (Visual Studio solution).
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -17,7 +19,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     # Visual Studio
     set(CMAKE_CONFIGURATION_TYPES "Release;Debug")
-endif()
+endif ()
 
 # Setting project directories.
 # XML ISA Spec Decoder API: accepts ISA Spec for specific architecture
@@ -25,9 +27,19 @@ endif()
 # for specific instructions in the architecture.
 add_subdirectory(./source/isa_decoder)
 
-# Examples: demonstrates utilities and API features using example apps
-add_subdirectory(./source/examples)
+if (EXCLUDE_ISA_CLI_EXAMPLES_TESTS)
+    message("-- Excluding CLI, examples and tests.")
+else()
+    # Examples: demonstrates utilities and API features using example apps
+    add_subdirectory(./source/examples)
 
-# CLI commands: provides command line interface implementation
-# for generation of various CLI programs.
-add_subdirectory(./source/isa_spec_cli)
+    # CLI commands: provides command line interface implementation
+    # for generation of various CLI programs.
+    add_subdirectory(./source/isa_spec_cli)
+
+    # ISA explorer API
+    add_subdirectory(./source/isa_explorer)
+
+    # Unit testing suite
+    add_subdirectory(./test/source)
+endif ()

@@ -9,7 +9,7 @@ set (THIRD_PARTY_DIR ../third_party)
 # Control the path of tinyxml2.
 set (TINYXML_DIR ${THIRD_PARTY_DIR}/tinyxml2)
 if (TINYXML_SRC_PATH)
-    message("-- IsaDecoder: Overwritting default tinyxml2 source files with ${TINYXML_SRC_PATH}")
+    message("-- IsaExplorer: Overwritting default tinyxml2 source files with ${TINYXML_SRC_PATH}")
     set (TINYXML_DIR ${TINYXML_SRC_PATH})
 endif()
 
@@ -22,13 +22,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
 # Setting all header files for this project.
 set (ALL_H
     # Top interface header.
-    ${INC_DIR}/amdisa/isa_decoder.h
+    ${INC_DIR}/amdisa/isa_explorer.h
     ${INC_DIR}/amdisa/api_version.h
 
     # Local library headers.
-    ${SRC_DIR}/common/amdisa_expression_tree_consts.h
     ${SRC_DIR}/common/amdisa_structures.h
-    ${SRC_DIR}/common/amdisa_xml_element_consts.h
     ${SRC_DIR}/common/amdisa_utility.h
     ${SRC_DIR}/common/isa_xml_reader.h
 
@@ -39,8 +37,7 @@ set (ALL_H
 # Setting all source files for this project.
 set (ALL_CPP
     # Top interface source file.
-    ./isa_decoder.cpp
-    ./encoding_condition_handler.hpp
+    ./isa_explorer.cpp
 
     # Local library source files.
     ${SRC_DIR}/common/amdisa_utility.cpp
@@ -52,18 +49,19 @@ set (ALL_CPP
 )
 
 # Adding target.
+add_library(isa_explorer STATIC ${ALL_CPP})
 # Static Library
-add_library(isa_decoder STATIC ${ALL_CPP})
-target_include_directories(isa_decoder PRIVATE
+target_include_directories(isa_explorer PRIVATE
     ${SRC_DIR}/common
     ${TINYXML_DIR}
     PUBLIC
     ${INC_DIR}
 )
 
+
 # Dynamic Library
-add_library(isa_decoder_dynamic SHARED ${ALL_CPP})
-target_include_directories(isa_decoder_dynamic PRIVATE
+add_library(isa_explorer_dynamic SHARED ${ALL_CPP})
+target_include_directories(isa_explorer_dynamic PRIVATE
     ${SRC_DIR}/common
     ${TINYXML_DIR}
     PUBLIC
@@ -73,11 +71,11 @@ target_include_directories(isa_decoder_dynamic PRIVATE
 # install public headers
 install(DIRECTORY ${INC_DIR}/amdisa DESTINATION include COMPONENT dev)
 
-install(TARGETS isa_decoder EXPORT isa_decoderTargets
+install(TARGETS isa_explorer EXPORT isa_explorerTargets
         ARCHIVE DESTINATION lib COMPONENT binary
         LIBRARY DESTINATION lib COMPONENT binary
 )
-install(TARGETS isa_decoder_dynamic EXPORT isa_decoder_dynamicTargets
+install(TARGETS isa_explorer_dynamic EXPORT isa_explorer_dynamicTargets
 
         ARCHIVE DESTINATION lib COMPONENT binary
         LIBRARY DESTINATION lib COMPONENT binary
@@ -85,4 +83,4 @@ install(TARGETS isa_decoder_dynamic EXPORT isa_decoder_dynamicTargets
 
 
 # Group these projects under an Examples folder.
-set_target_properties(isa_decoder isa_decoder_dynamic PROPERTIES FOLDER "libs")
+set_target_properties(isa_explorer isa_explorer_dynamic PROPERTIES FOLDER "libs")

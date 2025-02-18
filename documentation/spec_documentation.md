@@ -328,8 +328,11 @@ List of child elements:
 | #  | Element                   | XML element name          | Description|
 | -- | ------------------------- | ------------------------- | -|
 | 1. | Operand type name         | \<OperandTypeName\>         | Name of the operand as defined in the ISA. For example, v1, s3, vcc, etc. |
-| 2. | Subtypes                  | \<Subtypes\>                | Lists all subtype names that compose the give type. |
+| 2. | Subtypes                  | \<Subtypes\>                | Operand types have hierarchy, meaning that certain operand types can encompass or include subsets of other operand types (subtypes). This element lists all subtype names that compose the given type. |
 | 3. | Operand predefined values | [\<OperandPredefinedValues\>](#operandpredefinedvalues) | Lists all predefined operand values. A predefined value maps encoded integer value in the binary opcode to the corresponding assembly name. |
+
+> [!NOTE]  
+> The `Subtypes` sub-element of `OperandType` is supported by XML schema version v1.1.0 and above.
 
 ### \<OperandPredefinedValues\>
 Hierarchy: \<Spec\> → \<ISA\> → \<OperandTypes\> →  \<OperandType\> → **\<OperandPredefinedValues\>**
@@ -381,3 +384,10 @@ List of child elements:
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → \<FunctionalGroups\> → \<FunctionalGroup\> → **\<Subgroup\>**
 
 Description: provides the associated subgroup for the instruction in this architecture. For example, a VMEM instruction can have the following subtypes: LOAD, STORE, ATOMIC, TEXTURE, etc.
+
+## Appendix A
+### XML Specification Change Log
+| Change Type | Feature/Element | v1.0.0 | v1.1.0 | Notes |
+|-|-|-|-|-|
+| New Feature | \<Subtypes\> | Not available | Added | Enables grouping of operand types |
+| New Values | \<FunctionalSubgroup\> | Not available | MFMA, WMMA, TRANSCENDENTAL values added | Enables more granularity of grouping |

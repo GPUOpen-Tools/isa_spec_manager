@@ -1,5 +1,5 @@
 @echo off
-:: prebuild.bat --vs 2019
+:: prebuild.bat --vs 2022
 SETLOCAL
 
 rem Print help message
@@ -19,11 +19,14 @@ echo Usage:  prebuild.bat ^[options^]
 echo:
 echo Options:
 echo    --cmake              Path to cmake executable to use. If not specified, the cmake from PATH env variable will be used.
-echo    --vs                 Microsoft Visual Studio version. Currently supported values are: "2015", "2017", "2019" and "2022". The default is "2019".
+echo    --tinyxml2_src_path  Path to TinyXML2 source. If not specified, the default TinyXML2 bundled with the isa_decoder will be used.
+echo    --vs                 Microsoft Visual Studio version. Currently supported values are: "2015", "2017", "2019" and "2022". The default is "2022".
+echo    --decoder_only       Only include the decoder library for this project; skip the command line interface, examples and tests.
 echo:
 echo Examples:
-echo    prebuild.bat
-echo    prebuild.bat --vs 2017
+echo    prebuild_windows.bat
+echo    prebuild_windows.bat --vs 2022
+echo    prebuild_windows.bat --vs 2022 --tinyxml2_src_path [path to custom tinyxml2]
 
 goto :exit
 
@@ -33,24 +36,17 @@ set CURRENT_DIR=%CD%
 
 rem Default values
 set CMAKE_PATH=cmake
-set VS_VER=2019
-set TEST=-DTEST_PROJECT=ON
-set BUILD_INTERNAL=-DBuildInternal=OFF
+set VS_VER=2022
+set DECODER_ONLY=
+set TINYXML=
 
 :begin
 if [%1]==[] goto :start_cmake
-if "%1"=="--no-test" goto :set_notest_flag
-if "%1"=="--public-only" goto :set_public_build_flag
 if "%1"=="--cmake" goto :set_cmake
 if "%1"=="--vs" goto :set_vs
-if "%1"=="--internal" goto :set_internal_build_flag
+if "%1"=="--tinyxml2_src_path" goto :set_tinyxml2_src_path
+if "%1"=="--decoder_only" goto :set_decoder_only
 goto :bad_arg
-
-:set_notest_flag
-goto :start_cmake
-
-:set_internal_build_flag
-goto :start_cmake
 
 :set_cmake
 set CMAKE_PATH=%2
@@ -60,8 +56,16 @@ goto :shift_2args
 set VS_VER=%2
 goto :shift_2args
 
+:set_tinyxml2_src_path
+set TINYXML=-DTINYXML_SRC_PATH=%2
+goto :shift_2args
+
 :set_verbose
 @echo on
+goto :shift_arg
+
+:set_decoder_only
+set DECODER_ONLY="-DEXCLUDE_ISA_CLI_EXAMPLES_TESTS=ON"
 goto :shift_arg
 
 :shift_2args
@@ -109,7 +113,7 @@ rem Invoke cmake with required arguments.
 echo:
 echo Running cmake to generate a VisualStudio solution...
 cd %OUTPUT_FOLDER%
-%CMAKE_PATH% -G %CMAKE_VS% %CMAKE_VSARCH% ..\..\..
+%CMAKE_PATH% %DECODER_ONLY% %TINYXML% -G %CMAKE_VS% %CMAKE_VSARCH% ..\..\..
 if not %ERRORLEVEL%==0 (
     echo "ERROR: cmake failed. Aborting..."
     exit /b 1

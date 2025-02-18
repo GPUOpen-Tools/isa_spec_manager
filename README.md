@@ -3,6 +3,8 @@ A set of tools for parsing and using AMD's machine-readable GPU ISA specificatio
 
 The `IsaDecoder` API makes it easy to parse the specification XML files, decode instructions and even decode whole shaders.
 
+The `explorer::Spec` experimental API lets you iterate over the elements of a given specification file.
+
 For usage examples, see the [examples subfolder](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/source/examples).
 
 ## Building isa_spec_manager
@@ -26,10 +28,25 @@ cd ./isa_spec_manager/build
 
 The above script will create a windows directory and generate a solution for Visual Studio.
 
+By default, a solution is generated for VS 2022. To generate a solution for a different VS version or to use a different MSVC toolchain use the `--vs` argument.
+For example, to generate the solution for VS 2019 with the VS 2019 toolchain, run:
+
+``
+./prebuild_windows.bat --vs 2019
+``
+
 ## Using the API
+For the API and specification documentation, please see the [documentation subfolder](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/documentation).
+
 The following example files can give you a quick overview of how to start using the XML ISA spec in your project:
-* Basic usage example: [./source/examples/basic_decoder.cpp](./source/examples/basic_decoder.cpp)
-* Usage example with multiple architectures in flight: [./source/examples/multi_arch_decoder.cpp](./source/examples/multi_arch_decoder.cpp)
+
+### IsaDecoder
+* Basic usage example: [./source/examples/basic_decoder.cpp](./source/examples/basic_decoder.cpp). This sample requires a single command line argument which is a full path to the XML specification file.
+* Usage example with multiple architectures in flight: [./source/examples/multi_arch_decoder.cpp](./source/examples/multi_arch_decoder.cpp). This sample requires one or more command line arguments which are the full paths to the XML specification files.
+
+### explorer::Spec
+* Basic usage example: [./source/examples/basic_explorer.cpp](./source/examples/basic_explorer.cpp). This sample requires a single command line argument which is a full path to the XML specification file.
+
 
 ## Getting the ISA specification files
-The Machine-Readable GPU ISA specification files can be downloaded from [AMD's Machine-Readable GPU ISA Specification page on GPUOpen.com](https://gpuopen.com/machine-readable-isa/).
+The Machine-Readable GPU ISA specification files can be downloaded from [AMD's Machine-Readable GPU ISA Specification page on GPUOpen.com](https://gpuopen.com/machine-readable-isa).

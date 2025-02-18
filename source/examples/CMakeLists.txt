@@ -28,5 +28,16 @@ target_link_libraries(multiarch_decoder PRIVATE
     isa_decoder
 )
 
+
+# Adding target for basic_explorer
+add_executable(basic_explorer ./basic_explorer.cpp)
+
+target_include_directories(basic_explorer PRIVATE
+    ${INC_DIR}
+)
+target_link_libraries(basic_explorer PRIVATE
+    isa_explorer
+)
+
 # Group these projects under an Examples folder.
-set_target_properties(multiarch_decoder basic_decoder PROPERTIES FOLDER "examples")
+set_target_properties(multiarch_decoder basic_decoder basic_explorer PROPERTIES FOLDER "examples")

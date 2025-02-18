@@ -195,7 +195,7 @@ namespace amdisa
         XmlInstructionInfo->InsertEndChild(parent_element);
         AddToParentXmlElement(parent_element, kElementName, kFunctionalGroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalGroup)]);
         AddToParentXmlElement(
-            parent_element, kAttributeTypeSubgroup, kFunctionalSubgroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalSubgroup)]);
+            parent_element, kElementSubgroup, kFunctionalSubgroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalSubgroup)]);
         AddToParentXmlElement(parent_element, kElementDescription, inst.functional_group_subgroup_info.description.c_str());
     }
 

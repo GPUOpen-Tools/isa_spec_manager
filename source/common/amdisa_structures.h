@@ -297,6 +297,7 @@ namespace amdisa
         std::string                  name;
         std::string                  description;
         bool                         is_partitioned = false;
+        std::vector<std::string>     subtype_names;
         std::vector<PredefinedValue> predefined_values;
         MicrocodeFormat              microcode_format;
 

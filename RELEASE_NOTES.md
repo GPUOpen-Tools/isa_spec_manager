@@ -23,12 +23,22 @@ For usage examples and instructions on how to build the project, please see [sou
 
 **Note:** while the `IsaDecoder` API is a good way to get started with parsing the XML files, nothing prevents you from parsing the files yourself and building your own custom workflow. To do that please refer to the XML schema documentation [XML schema documentation](https://github.com/GPUOpen-Tools/isa_spec_manager/blob/main/documentation/spec_documentation.md).
 
+New in this release:
+* Added support for operand subtypes (requires XML schema version `v1.1.0`).
+* Introducing the experimental `explorer::Spec` API for iterating over the elements of a given specification file. See the [documentation](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/documentation) and [examples](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/source/examples) subfolders for more details.
+* On Windows, the solution is now generated for the VS2022 toolchain by default.
+* Unit tests are now part of the repository.
+* Bug fixes and performance improvements.
+
 ## Known issues ##
 
 ### Specification ###
 * Information about encoding modifiers is not provided in the specification.
+* `S_ATOMIC_*` instructions have a `VMEM` functional group (instead of `SMEM`).
 
 ### API and tools ###
 
-* Decoding of MIMG instructions (such as IMAGE_STORE and IMAGE_LOAD) may produce the wrong register indices for source vector register operands.
+* Decoding of `MIMG` instructions (such as `IMAGE_STORE` and `IMAGE_LOAD`) may produce the wrong register indices for source vector register operands.
+* Decoding binary representation of certain RDNA™2 `MIMG`, `MUBUF` and `MTBUF` instructions may produce the wrong results.
+* Decoding `DS` instructions may return the wrong operands when decoded via `IsaDecoder::DecodeInstruction()` with an `uint64_t` argument.
 
