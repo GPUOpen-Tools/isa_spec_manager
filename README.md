@@ -26,7 +26,7 @@ cd ./isa_spec_manager/build
 ./prebuild_windows.bat
 ```
 
-The above script will create a windows directory and generate a solution for Visual Studio.
+The above script will create a `windows` subfolder and generate a Visual Studio solution within it.
 
 By default, a solution is generated for VS 2022. To generate a solution for a different VS version or to use a different MSVC toolchain use the `--vs` argument.
 For example, to generate the solution for VS 2019 with the VS 2019 toolchain, run:
