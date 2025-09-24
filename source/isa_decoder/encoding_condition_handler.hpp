@@ -1378,6 +1378,98 @@ namespace amdisa
         return ((dword & 0x1ff)) == 249;
     }
 
+    static bool IsArch3VopcDefault(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch3VopcInstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch3VopcVopSdwaSdstEncHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch3Sop1Default(uint64_t dword) {
+        return ((dword & 0xff)) != 255;
+    }
+
+    static bool IsArch3Sop1InstLiteralHasLit0(uint64_t dword) {
+        return ((dword & 0xff)) == 255;
+    }
+
+    static bool IsArch3Sop2Default(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch3Sop2InstLiteralHasLit0(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch3Sop2InstLiteralHasLit1(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch3Sop2InstLiteralHasLit0HasLit1(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch3SopcDefault(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch3SopcInstLiteralHasLit0(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch3SopcInstLiteralHasLit1(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch3SopcInstLiteralHasLit0HasLit1(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch3Vop1Default(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch3Vop1InstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch3Vop1VopDppHasDpp(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch3Vop1VopSdwaHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch3Vop2Default(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch3Vop2InstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch3Vop2InstLiteralDefault(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch3Vop2VopDppHasDpp(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch3Vop2VopSdwaHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch3Vop2VopSdwaSdstEncHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
     struct EncodingConditionHandler
     {
         EncodingConditionHandler()
@@ -1725,6 +1817,29 @@ namespace amdisa
             arch_conditions_[2]["VOP2_VOP_DPP_has_dpp"] = IsArch2Vop2VopDppHasDpp;
             arch_conditions_[2]["VOP2_VOP_SDWA_has_sdwa"] = IsArch2Vop2VopSdwaHasSdwa;
             arch_conditions_[2]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch2Vop2VopSdwaSdstEncHasSdwa;
+            arch_conditions_[3]["VOPC_default"] = IsArch3VopcDefault;
+            arch_conditions_[3]["VOPC_INST_LITERAL_has_lit"] = IsArch3VopcInstLiteralHasLit;
+            arch_conditions_[3]["VOPC_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch3VopcVopSdwaSdstEncHasSdwa;
+            arch_conditions_[3]["SOP1_default"] = IsArch3Sop1Default;
+            arch_conditions_[3]["SOP1_INST_LITERAL_has_lit_0"] = IsArch3Sop1InstLiteralHasLit0;
+            arch_conditions_[3]["SOP2_default"] = IsArch3Sop2Default;
+            arch_conditions_[3]["SOP2_INST_LITERAL_has_lit_0"] = IsArch3Sop2InstLiteralHasLit0;
+            arch_conditions_[3]["SOP2_INST_LITERAL_has_lit_1"] = IsArch3Sop2InstLiteralHasLit1;
+            arch_conditions_[3]["SOP2_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch3Sop2InstLiteralHasLit0HasLit1;
+            arch_conditions_[3]["SOPC_default"] = IsArch3SopcDefault;
+            arch_conditions_[3]["SOPC_INST_LITERAL_has_lit_0"] = IsArch3SopcInstLiteralHasLit0;
+            arch_conditions_[3]["SOPC_INST_LITERAL_has_lit_1"] = IsArch3SopcInstLiteralHasLit1;
+            arch_conditions_[3]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch3SopcInstLiteralHasLit0HasLit1;
+            arch_conditions_[3]["VOP1_default"] = IsArch3Vop1Default;
+            arch_conditions_[3]["VOP1_INST_LITERAL_has_lit"] = IsArch3Vop1InstLiteralHasLit;
+            arch_conditions_[3]["VOP1_VOP_DPP_has_dpp"] = IsArch3Vop1VopDppHasDpp;
+            arch_conditions_[3]["VOP1_VOP_SDWA_has_sdwa"] = IsArch3Vop1VopSdwaHasSdwa;
+            arch_conditions_[3]["VOP2_default"] = IsArch3Vop2Default;
+            arch_conditions_[3]["VOP2_INST_LITERAL_has_lit"] = IsArch3Vop2InstLiteralHasLit;
+            arch_conditions_[3]["VOP2_INST_LITERAL_default"] = IsArch3Vop2InstLiteralDefault;
+            arch_conditions_[3]["VOP2_VOP_DPP_has_dpp"] = IsArch3Vop2VopDppHasDpp;
+            arch_conditions_[3]["VOP2_VOP_SDWA_has_sdwa"] = IsArch3Vop2VopSdwaHasSdwa;
+            arch_conditions_[3]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch3Vop2VopSdwaSdstEncHasSdwa;
         }
 
         using EncodingsToConditionFunctions = std::map<std::string, std::function<bool(uint64_t)>>;

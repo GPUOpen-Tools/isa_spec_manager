@@ -22,7 +22,8 @@ namespace amdisa
         kRdna4,
         kCdna1,
         kCdna2,
-        kCdna3
+        kCdna3,
+        kCdna4
     };
 
     // Constants.

@@ -1,5 +1,5 @@
 # Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 
 # Setting project directories.
 set (SRC_DIR ../../source)

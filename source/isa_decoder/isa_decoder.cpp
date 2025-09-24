@@ -86,6 +86,7 @@ namespace amdisa
     static const std::map<uint32_t, GpuArchitecture> kArchitectureIdToEnum = {{0, GpuArchitecture::kCdna1},
                                                                               {1, GpuArchitecture::kCdna2},
                                                                               {2, GpuArchitecture::kCdna3},
+                                                                              {3, GpuArchitecture::kCdna4},
                                                                               {5, GpuArchitecture::kRdna1},
                                                                               {6, GpuArchitecture::kRdna2},
                                                                               {8, GpuArchitecture::kRdna3},
