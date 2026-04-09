@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
  */
 #include "amdisa_tests.h"
 #include "amdisa/isa_decoder.h"
 #include "catch.hpp"
 
-TEST_CASE("Test to fail decode of a shader disassembly text", "[decode][text][fail]")
+TEST_CASE("Test to fail decode of a shader disassembly text", "[isa_decoder][decode][text][fail]")
 {
     amdisa::IsaDecoder decoder;
     std::string        msg;
@@ -16,7 +16,7 @@ TEST_CASE("Test to fail decode of a shader disassembly text", "[decode][text][fa
     REQUIRE(decoder.DecodeShaderDisassemblyText("", info, msg, false) == false);
 }
 
-TEST_CASE("Test to decode of a shader disassembly text", "[decode][text]")
+TEST_CASE("Test to decode of a shader disassembly text", "[isa_decoder][decode][text]")
 {
     amdisa::IsaDecoder decoder;
     std::string        msg;
@@ -28,7 +28,7 @@ TEST_CASE("Test to decode of a shader disassembly text", "[decode][text]")
     REQUIRE(info[0].bundle[0].instruction_name == "S_CMP_EQ_U32");
 }
 
-TEST_CASE("Test to fail decode of a shader disassembly file", "[decode][file][fail]")
+TEST_CASE("Test to fail decode of a shader disassembly file", "[isa_decoder][decode][file][fail]")
 {
     amdisa::IsaDecoder decoder;
     std::string        msg;

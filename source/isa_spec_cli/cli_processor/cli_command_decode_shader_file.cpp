@@ -193,19 +193,17 @@ namespace amdisa
         parent_element = XmlDoc->NewElement(kElementFunctionalGroup);
         assert(parent_element != nullptr);
         XmlInstructionInfo->InsertEndChild(parent_element);
-        AddToParentXmlElement(parent_element, kElementName, kFunctionalGroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalGroup)]);
-        AddToParentXmlElement(
-            parent_element, kElementSubgroup, kFunctionalSubgroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalSubgroup)]);
+        AddToParentXmlElement(parent_element, kElementName, FunctionalGroupNames[static_cast<int>(inst.functional_group_subgroup_info.isa_functional_group)]);
+        for (const auto& subgroup : inst.functional_group_subgroup_info.isa_functional_subgroups)
+        {
+            AddToParentXmlElement(parent_element, kElementSubgroup, FunctionalSubgroupNames[static_cast<int>(subgroup)]);
+        }
         AddToParentXmlElement(parent_element, kElementDescription, inst.functional_group_subgroup_info.description.c_str());
     }
 
     bool CliCommandDecodeShaderFile::Execute(std::string& err_message)
     {
-        bool is_executed = false;
         std::cout << kStringInfoDecodeShaderFileStart << shader_file_path_ << std::endl;
-
-        // Capitalize info format for consistency.
-        const std::string info_format_cap = AmdIsaUtility::ToUpper(info_format_);
 
         // API to decode instruction.
         std::string                        api_error_message;
@@ -217,10 +215,11 @@ namespace amdisa
         if (is_decode_successful)
         {
             std::cout << kStringInfoDecodeShaderFileSuccessful << std::endl;
-            if (info_format_cap == "XML")
+            if (!output_xml_path_.empty())
             {
                 // Variables used for generating output in XML format
                 XMLDocument XmlOutput;
+
                 XMLElement* XmlInfo = XmlOutput.NewElement("DecodedOutput");
                 XmlOutput.InsertFirstChild(XmlInfo);
                 XMLElement* XmlInstructionInfos = XmlOutput.NewElement(kElementShaderInstructions);
@@ -237,23 +236,12 @@ namespace amdisa
                     XmlInstructionInfos->InsertEndChild(XmlInstructionInfo);
                     XmlInstructionInfo = nullptr;
                 }
-                if (!output_xml_path_.empty())
-                {
-                    tinyxml2::XMLError status = XmlOutput.SaveFile(output_xml_path_.c_str());
+                tinyxml2::XMLError status = XmlOutput.SaveFile(output_xml_path_.c_str());
 
-                    if (status == tinyxml2::XML_SUCCESS)
-                    {
-                        is_executed = true;
-                    }
-                    else
-                    {
-                        err_message = kStringErrorXmlWriteFailed;
-                    }
-                }
-                else
+                if (status != tinyxml2::XML_SUCCESS)
                 {
                     XmlOutput.Print();
-                    is_executed = true;
+                    err_message = kStringErrorXmlWriteFailed;
                 }
             }
             else
@@ -303,16 +291,18 @@ namespace amdisa
 
                         // Print instruction's functional group and subgroup info
                         std::cout << "Functional Group: "
-                                  << kFunctionalGroupName[static_cast<int>(instruction_info.functional_group_subgroup_info.IsaFunctionalGroup)] << std::endl;
-                        std::cout << "Functional Subgroup: "
-                                  << kFunctionalSubgroupName[static_cast<int>(instruction_info.functional_group_subgroup_info.IsaFunctionalSubgroup)]
-                                  << std::endl;
+                                  << FunctionalGroupNames[static_cast<int>(instruction_info.functional_group_subgroup_info.isa_functional_group)] << std::endl;
+                        std::cout << "Functional Subgroup: ";
+                        for (const auto& subgroup : instruction_info.functional_group_subgroup_info.isa_functional_subgroups)
+                        {
+                            std::cout << amdisa::FunctionalSubgroupNames[static_cast<int>(subgroup)] << "; ";
+                        }
+                        std::cout << std::endl;
                         std::cout << "Functional Group Description: " << instruction_info.functional_group_subgroup_info.description << std::endl;
 
                         std::cout << "===" << std::endl;
                     }
                 }
-                is_executed = true;
             }
         }
         else
@@ -322,6 +312,6 @@ namespace amdisa
             std::cerr << api_error_message;
         }
 
-        return is_executed;
+        return is_decode_successful;
     }
 }  // namespace amdisa

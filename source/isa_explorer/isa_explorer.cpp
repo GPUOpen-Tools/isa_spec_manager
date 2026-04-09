@@ -30,22 +30,13 @@ namespace amdisa
         class Spec::Impl
         {
         public:
-            bool Init(const std::string& input_xml_file_path, std::string& err_message)
+            bool Init(const IsaSpec& spec, std::string& err_message)
             {
-                // Read the spec.
-                amdisa::IsaSpec    spec;
-                bool               is_read_successful = amdisa::IsaXmlReader::ReadSpec(input_xml_file_path, spec, err_message);
-                const std::string& xml_schema_version = spec.info.schema_version;
-
                 // Check compatibility.
-                bool is_compatible = false;
-                if (is_read_successful)
-                {
-                    const std::string& xml_schema_version = spec.info.schema_version;
-                    is_compatible                         = amdisa::explorer::ApiVersion::IsCompatible(xml_schema_version, err_message);
-                }
+                const std::string& xml_schema_version = spec.info.schema_version;
+                bool               is_compatible      = amdisa::explorer::ApiVersion::IsCompatible(xml_schema_version, err_message);
 
-                if (is_read_successful && is_compatible)
+                if (is_compatible)
                 {
                     architecture_ = std::make_unique<Architecture>(spec.architecture.name);
 
@@ -129,10 +120,11 @@ namespace amdisa
                                              std::forward_as_tuple(FunctionalGroup(func_group_info.name, func_group_info.desc, {})));
                     }
 
-                    if (xml_schema_version >= "1.1.0")
+                    if (spec.info.schema_version >= "1.1.0")
                     {
                         // Handle the empty case -- FSG_NOT_ASSIGNED
-                        func_subgroups_.emplace(std::piecewise_construct, std::forward_as_tuple(""), std::forward_as_tuple(FunctionalSubgroup("")));
+                        func_subgroups_.emplace(
+                            std::piecewise_construct, std::forward_as_tuple("NOT_ASSIGNED"), std::forward_as_tuple(FunctionalSubgroup("-")));
 
                         for (auto& func_subgroup_info : spec.functional_subgroup_info)
                         {
@@ -145,9 +137,11 @@ namespace amdisa
                     {
                         for (auto& instr : spec.instructions)
                         {
-                            func_subgroups_.emplace(std::piecewise_construct,
-                                                    std::forward_as_tuple(instr.functional_subgroup_name),
-                                                    std::forward_as_tuple(FunctionalSubgroup(instr.functional_subgroup_name)));
+                            for (const auto& subgroup : instr.functional_subgroups)
+                            {
+                                func_subgroups_.emplace(
+                                    std::piecewise_construct, std::forward_as_tuple(subgroup), std::forward_as_tuple(FunctionalSubgroup(subgroup)));
+                            }
                         }
                     }
                     for (auto& operand_type : spec.operand_types)
@@ -184,7 +178,12 @@ namespace amdisa
                             encodings.emplace_back(encoding.name, encoding.opcode, operands);
                         }
                         auto& func_group    = func_groups_.at(instr.functional_group_name);
-                        auto& func_subgroup = func_subgroups_.at(instr.functional_subgroup_name);
+                        std::vector<FunctionalSubgroup> func_subgroups;
+                        for (const auto& subgroup : instr.functional_subgroups)
+                        {
+                            auto& func_subgroup = func_subgroups_.at(subgroup);
+                            func_subgroups.emplace_back(func_subgroup);
+                        }
                         instructions_.emplace(std::piecewise_construct,
                                               std::forward_as_tuple(instr.name),
                                               std::forward_as_tuple(instr.name,
@@ -195,16 +194,20 @@ namespace amdisa
                                                                     instr.is_immediately_executed,
                                                                     instr.is_program_terminator,
                                                                     func_group,
-                                                                    func_subgroup,
+                                                                    func_subgroups,
                                                                     encodings));
 
                         auto ins = &instructions_.at(instr.name);
                         func_group.AddInstruction(ins);
-                        func_subgroup.AddInstruction(ins);
+                        for (const auto& subgroup : instr.functional_subgroups)
+                        {
+                            auto& func_subgroup = func_subgroups_.at(subgroup);
+                            func_subgroup.AddInstruction(ins);
+                        }
                     }
                 }
 
-                return is_read_successful && is_compatible;
+                return is_compatible;
             }
 
             const std::map<std::string, Instruction>& Instructions() const noexcept
@@ -215,6 +218,11 @@ namespace amdisa
             const std::map<std::string, OperandType>& OperandTypes() const noexcept
             {
                 return operand_types_;
+            }
+
+            const std::map<std::string, FunctionalGroup>& FunctionalGroups() const noexcept
+            {
+                return func_groups_;
             }
 
             const Architecture& GetArchitecture() const noexcept
@@ -406,7 +414,7 @@ namespace amdisa
             return instructions_;
         }
 
-        const std::vector<FunctionalSubgroup>& FunctionalGroup::FuncSubgroups() const noexcept
+        const std::vector<FunctionalSubgroup> FunctionalGroup::FuncSubgroups() const noexcept
         {
             return functional_subgroups_;
         }
@@ -583,7 +591,7 @@ namespace amdisa
                                  bool                                    is_immediately_executed,
                                  bool                                    is_program_terminator,
                                  class FunctionalGroup&                  functional_group,
-                                 class FunctionalSubgroup&               functional_subgroup,
+                                 const std::vector<FunctionalSubgroup>&  functional_subgroups,
                                  const std::vector<InstructionEncoding>& encodings)
             : name_(name)
             , description_(description)
@@ -593,7 +601,7 @@ namespace amdisa
             , is_immediately_executed_(is_immediately_executed)
             , is_program_terminator_(is_program_terminator)
             , functional_group_(&functional_group)
-            , functional_subgroup_(&functional_subgroup)
+            , functional_subgroups_(functional_subgroups)
             , encodings_(encodings)
         {
         }
@@ -638,9 +646,9 @@ namespace amdisa
             return functional_group_;
         }
 
-        const FunctionalSubgroup* const Instruction::FuncSubgroup() const noexcept
+        const std::vector<FunctionalSubgroup> Instruction::FuncSubgroups() const noexcept
         {
-            return functional_subgroup_;
+            return functional_subgroups_;
         }
 
         const std::vector<InstructionEncoding>& Instruction::Encodings() const noexcept
@@ -656,7 +664,23 @@ namespace amdisa
         bool Spec::Init(const std::string& input_xml_file_path, std::string& err_message) noexcept
         {
             impl_ = std::make_unique<Impl>();
-            return impl_->Init(input_xml_file_path, err_message);
+
+            // Read the spec.
+            amdisa::IsaSpec    spec;
+            bool               is_read_successful = amdisa::IsaXmlReader::ReadSpec(input_xml_file_path, spec, err_message);
+
+            return is_read_successful && impl_->Init(spec, err_message);
+        }
+
+        bool Spec::Init(const char *input_xml_data, const size_t datalen, std::string& err_message) noexcept
+        {
+            impl_ = std::make_unique<Impl>();
+
+            // Read the spec.
+            amdisa::IsaSpec    spec;
+            bool               is_read_successful = amdisa::IsaXmlReader::ReadSpec(input_xml_data, datalen, spec, err_message);
+
+            return is_read_successful && impl_->Init(spec, err_message);
         }
 
         const std::map<std::string, Instruction>& Spec::GetInstructions() const noexcept
@@ -667,6 +691,11 @@ namespace amdisa
         const std::map<std::string, OperandType>& Spec::GetOperandTypes() const noexcept
         {
             return impl_->OperandTypes();
+        }
+
+        const std::map<std::string, amdisa::explorer::FunctionalGroup>& Spec::GetFunctionalGroups() const noexcept
+        {
+            return impl_->FunctionalGroups();
         }
 
         const Architecture& Spec::GetArchitecture() const noexcept

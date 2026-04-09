@@ -302,7 +302,7 @@ namespace amdisa
             ///@brief Get the subgroups in the functional group
             ///
             /// @returns Subgroups in the functional group
-            const std::vector<FunctionalSubgroup>& FuncSubgroups() const noexcept;
+            const std::vector<FunctionalSubgroup> FuncSubgroups() const noexcept;
 
         private:
             /// @brief Add the instruction to the functional group
@@ -495,7 +495,7 @@ namespace amdisa
                         bool                                    is_immediately_executed,
                         bool                                    is_program_terminator,
                         FunctionalGroup&                        functional_group,
-                        FunctionalSubgroup&                     functional_subgroup,
+                        const std::vector<FunctionalSubgroup>&  functional_subgroups,
                         const std::vector<InstructionEncoding>& encodings);
             /// @brief Get the name of the instruction
             ///
@@ -540,7 +540,7 @@ namespace amdisa
             /// @brief Get the functional subgroup to which the instruction belongs
             ///
             /// @returns Functional subgroup to which the instruction belongs
-            const FunctionalSubgroup* const FuncSubgroup() const noexcept;
+            const std::vector<FunctionalSubgroup> FuncSubgroups() const noexcept;
 
             /// @brief Get the encodings of the instruction
             ///
@@ -556,7 +556,7 @@ namespace amdisa
             const bool                             is_immediately_executed_;  ///< Whether the instruction is immediately executed
             const bool                             is_program_terminator_;    ///< Whether the instruction is a program terminator
             FunctionalGroup* const                 functional_group_;         ///< Functional group to which the instruction belongs
-            FunctionalSubgroup* const              functional_subgroup_;      ///< Functional subgroup to which the instruction belongs
+            const std::vector<FunctionalSubgroup>  functional_subgroups_;     ///< Functional subgroup to which the instruction belongs
             const std::vector<InstructionEncoding> encodings_;                ///< Encodings of the instruction
         };
 
@@ -588,6 +588,21 @@ namespace amdisa
              *         structures were initialized, false otherwise.
              */
             bool Init(const std::string& input_xml_file_path, std::string& err_message) noexcept;
+
+            /*
+             * Init --
+             *
+             * Reads in an XML file containing the ISA specification from memory and populates the
+             * internal data structures.
+             *
+             * @param input_xml_file_path  Path to the XML file containing the ISA specification.
+             * @param err_message          Reference to a string that will be populated with
+             *                             an error message if initialization fails.
+             *
+             * @return True if the XML file was successfully parsed and the internal
+             *         structures were initialized, false otherwise.
+             */
+            bool Init(const char *input_xml_data, const size_t datalen, std::string& err_message) noexcept;
 
             /*
              * GetArchitecture --
@@ -627,6 +642,16 @@ namespace amdisa
              *         type and the value is the corresponding OperandType object.
              */
             const std::map<std::string, OperandType>& GetOperandTypes() const noexcept;
+
+            /*
+             * GetFunctionalGroups --
+             *
+             * Returns the functional groups defined in this ISA.
+             *
+             * @return A const reference to a map where the key is the name of the functional group
+             *         type and the value is the corresponding FunctionalGroup object.
+             */
+            const std::map<std::string, FunctionalGroup>& GetFunctionalGroups() const noexcept;
 
             // Constructor control.
             Spec();

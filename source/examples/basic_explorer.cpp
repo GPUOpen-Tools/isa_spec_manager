@@ -17,7 +17,12 @@ static void print_instruction(const amdisa::explorer::Instruction& instruction)
     std::cout << "\tIsIndirectBranch ?: " << instruction.IsIndirectBranch() << std::endl;
     std::cout << "\tFunctionalGroup: " << instruction.FuncGroup()->Name() << std::endl;
     std::cout << "\t\t Description: " << instruction.FuncGroup()->Description() << std::endl << std::endl;
-    std::cout << "\tFunctionalSubgroup: " << instruction.FuncSubgroup()->Name() << std::endl;
+    std::cout << "\tFunctionalSubgroup: ";
+    for (const auto& subgroup : instruction.FuncSubgroups())
+    {
+        std::cout << subgroup.Name() << "; ";
+    }
+    std::cout << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -44,6 +49,19 @@ int main(int argc, char** argv)
         std::cerr << err_message << std::endl;
         return -1;
     }
+
+    // List all Functional Groups and their corresponding list of instructions.
+    const auto& functional_groups = explorer.GetFunctionalGroups();
+    for (const auto& fg : functional_groups)
+    {
+        std::cout << fg.first << ":" << std::endl;
+        for (const auto& instr : fg.second.Instructions())
+        {
+            std::cout << "\t" << instr->Name() << std::endl;
+        }
+    }
+
+    std::cout << std::endl << "-=-=-=-=-=-=-=-=-=-" << std::endl << std::endl;
 
     // Lookup an instruction by name.
     auto v_mov_b32 = explorer.GetInstructions().at("V_MOV_B32");

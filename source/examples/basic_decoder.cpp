@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
  */
-// IsaDecoderExamples.cpp: Demonstrates the decoding of an example single
+// basic_decoder.cpp: Demonstrates the decoding of an example single
 // instruction's binary representation using IsaDecoder - DecodeInstruction().
 // Required Argument for the program: Valid ISA Spec XML file path.
 
@@ -100,22 +100,35 @@ int main(int argc, char* argv[])
                 std::cout << "Instruction Description: " << inst.instruction_description << std::endl;
                 std::cout << "Encoding Name: " << inst.encoding_name << std::endl;
                 std::cout << "Encoding Description: " << inst.encoding_description << std::endl;
-                std::cout << "Functional Group: " << amdisa::kFunctionalGroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalGroup)]
+                std::cout << "Functional Group: " << amdisa::FunctionalGroupNames[static_cast<int>(inst.functional_group_subgroup_info.isa_functional_group)]
                           << std::endl;
-                std::cout << "Functional Subgroup: "
-                          << amdisa::kFunctionalSubgroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalSubgroup)] << std::endl;
+                std::cout << "Functional Subgroup: ";
+                for (const auto& subgroup : inst.functional_group_subgroup_info.isa_functional_subgroups)
+                {
+                    std::cout << amdisa::FunctionalSubgroupNames[static_cast<int>(subgroup)] << "; ";
+                }
+                std::cout << std::endl;
                 std::cout << "Functional Group Description: " << inst.functional_group_subgroup_info.description << std::endl;
+
+                // Display operand information.
+                std::cout << "Instruction Operand Information:" << std::endl;
+                for (const auto& operand : inst.instruction_operands)
+                {
+                    std::cout << " - " << operand.operand_name;
+                    std::cout << " (Size: " << operand.operand_size << " bits";
+                    std::cout << " | Data Format: " << operand.data_format;
+                    std::cout << " | Encoding Field: " << operand.encoding_field_name;
+                    std::cout << ")" << std::endl;
+                }
+
                 // Similarly, the following information about the instruction can be
                 // fetched:
                 // 1. encoding:
                 //     encoding_fields - field_name, field_value, bit_count, bit_offset
                 //     encoding_layout
-                // 2. operands:
-                //     instruction_operands - operand_name, operand_size, is_input,
-                //                            is_output
-                // 3. modifiers:
+                // 2. modifiers:
                 //     operand_modifiers - modifier_name, value
-                // 4. semantics:
+                // 3. semantics:
                 //     instruction_semantic_info - is_program_terminator,
                 //                                 is_immediately_executed,
                 //                                 branch_info (is_branch,

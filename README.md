@@ -8,7 +8,7 @@ The `explorer::Spec` experimental API lets you iterate over the elements of a gi
 For usage examples, see the [examples subfolder](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/source/examples).
 
 ## Building isa_spec_manager
-To build the project, use the build scripts located in the ./build subfolder. Please note that the build process requires CMake with minimum version of 3.0.
+To build the project, use the build scripts located in the ./build subfolder. Please note that the build process requires CMake with minimum version of 3.10.
 
 ### Building on Linux
 ```

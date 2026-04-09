@@ -5,6 +5,7 @@
 
 // C++ libraries.
 #include <algorithm>
+#include <cassert>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -17,12 +18,12 @@ namespace amdisa
     // Warning string constants.
     static const char* kStringWarningCouldNotConvertStrToUnsigned = "Warning: could not convert string to integer: ";
 
-    bool AmdIsaUtility::GetRange(const Field& field, Range& range)
+    bool AmdIsaUtility::GetRange(const Field& field, Range& range, uint32_t range_order)
     {
         bool is_range_retrieved = false;
-        if (!field.ranges.empty())
+        if (!field.ranges.empty() && range_order < field.ranges.size())
         {
-            range              = field.ranges[0];
+            range              = field.ranges[range_order];
             is_range_retrieved = true;
         }
 
@@ -35,7 +36,7 @@ namespace amdisa
         for (const auto& field : microcode_format.bit_map)
         {
             Range range;
-            if (GetRange(field, range))
+            if (GetRange(field, range, 0))
             {
                 uint32_t bit_offset  = range.bit_offset;
                 uint32_t bit_count   = range.bit_count;
@@ -77,32 +78,21 @@ namespace amdisa
 
     std::string AmdIsaUtility::Strip(const std::string& str)
     {
+        auto start = std::find_if(str.begin(), str.end(), [](char c)
+            {
+                return !(c == ' ' || c == '\n' || c == '\r' || c == '\t');
+            });
+
+        auto end = std::find_if(str.rbegin(), str.rend(), [](char c)
+            {
+                return !(c == ' ' || c == '\n' || c == '\r' || c == '\t');
+            }).base();
+
         std::string stripped_str;
-        if (str.length() > 0)
+        if (start < end)
         {
-            int32_t pos_start = 0;
-            size_t  pos_end   = str.length() - 1;
-
-            // Skip leading whitespaces and special chars.
-            auto should_skip = [](const char& c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; };
-            while (pos_start < str.length() && should_skip(str[pos_start]))
-            {
-                ++pos_start;
-            }
-
-            // Skip trailing whitespaces and special chars.
-            while (pos_end - pos_start >= 0 && should_skip(str[pos_end]))
-            {
-                --pos_end;
-            }
-
-            // Get the middle.
-            for (size_t i = pos_start; i <= pos_end && pos_end != std::string::npos; i++)
-            {
-                stripped_str += str[i];
-            }
+            stripped_str = std::string(start, end);
         }
-
         return stripped_str;
     }
 
@@ -119,4 +109,54 @@ namespace amdisa
         }
         return result;
     }
+
+    uint64_t AmdIsaUtility::PositionValueToField(uint64_t value, const MicrocodeFormat& microcode_format, const std::string& field_name)
+    {
+        uint64_t ret = 0;
+        uint32_t order = 0;
+        uint32_t current_pos = 0;
+        std::vector<uint64_t> range_values;
+
+        const auto& field_iterator =
+            std::find_if(microcode_format.bit_map.begin(), microcode_format.bit_map.end(),
+                [&](const Field& field) { return field.name == field_name; });
+        assert(field_iterator->range_count > 0);
+
+        for (const auto& range : field_iterator->ranges)
+        {
+            // Check that the order in XML are sequential.
+            assert(order == range.order);
+
+            // Construct the mask.
+            uint32_t mask = (1ULL << range.bit_count) - 1;
+            uint32_t positioned_mask = mask << current_pos;
+
+            // Get the value.
+            uint64_t positioned_value = (value & positioned_mask) >> current_pos;
+
+            // Save the retrieved value to the final result.
+            order++;
+            current_pos += range.bit_count;
+            range_values.push_back(positioned_value << range.bit_offset);
+        }
+
+        for (const auto& range_value : range_values)
+        {
+            ret |= range_value;
+        }
+
+        return ret;
+    }
+
+    uint8_t AmdIsaUtility::BitCount(uint64_t n)
+    {
+        n = n - ((n >> 1) & 0x5555555555555555ULL);
+        n = (n & 0x3333333333333333ULL) + ((n >> 2) & 0x3333333333333333ULL);
+        n = (n + (n >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+        n = n + (n >> 8);
+        n = n + (n >> 16);
+        n = n + (n >> 32);
+        return n & 0x7F;  // 7 bits for max 64
+    }
+
 }  // namespace amdisa

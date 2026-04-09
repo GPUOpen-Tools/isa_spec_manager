@@ -156,7 +156,7 @@ List of child elements:
 | -- | ---------------- | ---------------- | - |
 | 1. | Field name       | \<FieldName\>      | Encoding field name. Should match one of the fields in [\<BitMap\>](#bitmap-microcodeformat). |
 | 2. | Data format name | \<DataFormatName\> | Data format of the operand. Should match one of the formats in [\<DataFormats\>](#dataformats). |
-| 3. | Operand type     | \<OperantType\>    | Type of the operand. Should match one of the types in [\<OperandTypes\>](#operandtypes)|
+| 3. | Operand type     | \<OperandType\>    | Type of the operand. Should match one of the types in [\<OperandTypes\>](#operandtypes)|
 | 4. | Operand size     | \<OperandSize\>    | The size of this operand in bits. |
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
  */
 #include "amdisa/isa_decoder.h"
 
@@ -15,6 +15,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 
 // Local libraries.
@@ -92,6 +93,16 @@ namespace amdisa
                                                                               {8, GpuArchitecture::kRdna3},
                                                                               {9, GpuArchitecture::kRdna3_5},
                                                                               {10, GpuArchitecture::kRdna4}};
+    static GpuArchitecture GetArchitectureWithId(uint32_t architecture_id)
+    {
+        GpuArchitecture ret            = GpuArchitecture::kUnknown;
+        auto            arch_enum_iter = kArchitectureIdToEnum.find(architecture_id);
+        if (arch_enum_iter != kArchitectureIdToEnum.end())
+        {
+            ret = arch_enum_iter->second;
+        }
+        return ret;
+    }
 
     // Masks.
     static const uint32_t kDwordMask = 0xffffffff;
@@ -119,6 +130,730 @@ namespace amdisa
     };
 
     // *** INTERNALLY-LINKED AUXILIARY FUNCTIONS - BEGIN ***
+
+    static uint64_t GetFieldValue(const Field& field, const std::vector<uint32_t>& working_dwords, std::vector<std::string>& log)
+    {
+        Range    range;
+        uint64_t field_value = 0;
+        if (!field.ranges.empty())
+        {
+            uint32_t              range_order   = 0;
+            uint32_t              prev_bitcount = 0;
+            std::vector<uint32_t> range_values;
+            for (const auto& range : field.ranges)
+            {
+                assert(range.order == range_order);
+                ++range_order;
+
+                uint64_t bit_count   = range.bit_count;
+                uint64_t bit_offset  = range.bit_offset;
+                uint64_t dword_index = bit_offset / 32;
+                uint32_t dword       = 0;
+                uint32_t range_value = 0;
+
+                if (dword_index < working_dwords.size())
+                {
+                    dword = working_dwords[dword_index];
+                }
+                else
+                {
+                    log.push_back(kStringWarningOutRangeDwordAccess);
+                }
+                uint64_t mask = ((1ULL << bit_count) - 1);
+                range_value   = (dword >> (bit_offset - 32 * dword_index)) & mask;
+                uint64_t padding_size = range.padding.bit_count;
+                if (padding_size > 0)
+                {
+                    uint32_t padding_value = range.padding.value;
+                    range_value            = (range_value << padding_size) | padding_value;
+                }
+                range_value <<= prev_bitcount;
+                prev_bitcount += range.bit_count;
+
+                range_values.push_back(range_value);
+            }
+
+            for (uint32_t range_value : range_values)
+            {
+                field_value |= range_value;
+            }
+        }
+        else
+        {
+            log.push_back(kStringErrorEmptyRange);
+            assert(false);
+        }
+        return field_value;
+    }
+
+    // Gets the iterator to the field from the bitmap with a specific name and gets the value of
+    // the field from the machine code.
+    static FieldIterator GetFieldIterator(const std::vector<uint32_t>& machine_code,
+                                          const std::string&           field_name,
+                                          const MicrocodeFormat&       microcode_format,
+                                          uint64_t&                    field_value,
+                                          std::vector<std::string>&    log)
+    {
+        FieldIterator found_field    = microcode_format.bit_map.end();
+        bool          is_field_found = field_name.empty();
+
+        // Go over each field in the passed microcode format structure.
+        for (auto field_iterator = microcode_format.bit_map.begin(); !is_field_found && field_iterator != microcode_format.bit_map.end(); ++field_iterator)
+        {
+            if (field_iterator->name.find(field_name) != std::string::npos)
+            {
+                is_field_found = true;
+                field_value    = GetFieldValue(*field_iterator, machine_code, log);
+                found_field    = field_iterator;
+            }
+        }
+
+        return found_field;
+    }
+
+    // FIXME: This namespace groups the code for the workaround to handle
+    // address component handling in MIMG instructions. The information
+    // hardcoded in this workaround must be transferred to XML.
+    namespace mimg_workaround
+    {
+        static const char* kStringErrorFailedToGetAddressCount = "Error: Failed to retrieve address count (acnt)";
+
+        // In MIMG encoding acnt (Address Component Count) indicates how many address
+        // components (like x, y, z, slice, face_id, fragid, mipid) are passed
+        // through VGPRs to the image instruction.
+        // This structure holds and provides Acnt values based on various fields
+        // of the instruction.
+        struct AcntHandler
+        {
+            // Dimension of the surface.
+            // Specifiction of DIM field in MIMG encoding.
+            enum class Dimension : int8_t
+            {
+                kUndefined = -1,
+                // A linear image.
+                k1d = 0,
+
+                // A two-dimensional image.
+                k2d = 1,
+
+                // A volumetric image.
+                k3d = 2,
+
+                // A cubemap consisting of 6 square 2D faces.
+                kCube = 3,
+
+                // A collection of 1D images.
+                k1dArray = 4,
+
+                // A stack of 2D images.
+                k2dArray = 5,
+
+                // A 2D image with multisample anti-aliasing support.
+                k2dMsaa = 6,
+
+                // A combination of 2D array and multisample anti-aliasing support.
+                k2dMsaaArray = 7
+            };
+
+            // At the core, Acnt is based on dimension. It then varies based on
+            // the opcode.
+            using DimensionToAcntTable = std::unordered_map<Dimension, uint32_t>;
+
+            // Generates Acnt information for RDNA 2 architecture.
+            void GenerateRdnaCdna1or2Table(GpuArchitecture architecture)
+            {
+                current_architecture = architecture;
+                tables[current_architecture]         = std::make_unique<AcntTable>();
+                AcntTable& table                     = *tables[current_architecture];
+
+                // Define table for load/store/atomic instructions.
+                std::shared_ptr<DimensionToAcntTable> lsa_table = std::make_shared<DimensionToAcntTable>();
+                lsa_table->emplace(Dimension::k1d, 0);
+                lsa_table->emplace(Dimension::k2d, 1);
+                lsa_table->emplace(Dimension::k3d, 2);
+                lsa_table->emplace(Dimension::kCube, 2);
+                lsa_table->emplace(Dimension::k1dArray, 1);
+                lsa_table->emplace(Dimension::k2dArray, 2);
+                lsa_table->emplace(Dimension::k2dMsaa, 2);
+                lsa_table->emplace(Dimension::k2dMsaaArray, 3);
+                table[0]   = lsa_table;  // IMAGE_LOAD
+                table[2]   = lsa_table;  // IMAGE_LOAD_PCK
+                table[3]   = lsa_table;  // IMAGE_LOAD_PCK_SGN
+                table[8]   = lsa_table;  // IMAGE_STORE
+                table[10]  = lsa_table;  // IMAGE_STORE_PCK
+                table[15]  = lsa_table;  // IMAGE_ATOMIC_SWAP
+                table[16]  = lsa_table;  // IMAGE_ATOMIC_CMPSWAP
+                table[17]  = lsa_table;  // IMAGE_ATOMIC_ADD
+                table[18]  = lsa_table;  // IMAGE_ATOMIC_SUB
+                table[20]  = lsa_table;  // IMAGE_ATOMIC_SMIN
+                table[21]  = lsa_table;  // IMAGE_ATOMIC_UMIN
+                table[22]  = lsa_table;  // IMAGE_ATOMIC_SMAX
+                table[23]  = lsa_table;  // IMAGE_ATOMIC_UMAX
+                table[24]  = lsa_table;  // IMAGE_ATOMIC_AND
+                table[25]  = lsa_table;  // IMAGE_ATOMIC_OR
+                table[26]  = lsa_table;  // IMAGE_ATOMIC_XOR
+                table[27]  = lsa_table;  // IMAGE_ATOMIC_INC
+                table[28]  = lsa_table;  // IMAGE_ATOMIC_DEC
+                table[29]  = lsa_table;  // IMAGE_ATOMIC_FCMPSWAP
+                table[30]  = lsa_table;  // IMAGE_ATOMIC_FMIN
+                table[31]  = lsa_table;  // IMAGE_ATOMIC_FMAX
+                table[66]  = lsa_table;  // IMAGE_LOAD_BY2
+                table[67]  = lsa_table;  // IMAGE_LOAD_BY4
+                table[82]  = lsa_table;  // IMAGE_STORE_BY2
+                table[83]  = lsa_table;  // IMAGE_STORE_BY4
+                table[112] = lsa_table;  // IMAGE_LOAD_PCK2
+                table[113] = lsa_table;  // IMAGE_LOAD_PCK4
+                table[118] = lsa_table;  // IMAGE_STORE_PCK2
+                table[119] = lsa_table;  // IMAGE_STORE_PCK4
+                table[128] = lsa_table;  // IMAGE_MSAA_LOAD
+
+                // Define table for load_mip/store_mip instructions.
+                std::shared_ptr<DimensionToAcntTable> ls_mip_table = std::make_shared<DimensionToAcntTable>();
+                ls_mip_table->emplace(Dimension::k1d, 1);
+                ls_mip_table->emplace(Dimension::k2d, 2);
+                ls_mip_table->emplace(Dimension::k3d, 3);
+                ls_mip_table->emplace(Dimension::kCube, 3);
+                ls_mip_table->emplace(Dimension::k1dArray, 2);
+                ls_mip_table->emplace(Dimension::k2dArray, 3);
+                table[1]   = ls_mip_table;  // IMAGE_LOAD_MIP
+                table[4]   = ls_mip_table;  // IMAGE_LOAD_MIP_PCK
+                table[5]   = ls_mip_table;  // IMAGE_LOAD_MIP_PCK_SGN
+                table[9]   = ls_mip_table;  // IMAGE_STORE_MIP
+                table[11]  = ls_mip_table;  // IMAGE_STORE_MIP_PCK
+                table[74]  = ls_mip_table;  // IMAGE_LOAD_MIP_BY2
+                table[75]  = ls_mip_table;  // IMAGE_LOAD_MIP_BY4
+                table[90]  = ls_mip_table;  // IMAGE_STORE_MIP_BY2
+                table[91]  = ls_mip_table;  // IMAGE_STORE_MIP_BY4
+                table[115] = ls_mip_table;  // IMAGE_LOAD_MIP_PCK2
+                table[116] = ls_mip_table;  // IMAGE_LOAD_MIP_PCK4
+                table[121] = ls_mip_table;  // IMAGE_STORE_MIP_PCK2
+                table[122] = ls_mip_table;  // IMAGE_STORE_MIP_PCK4
+
+                // Define table for sample instructions.
+                std::shared_ptr<DimensionToAcntTable> sample_table = std::make_shared<DimensionToAcntTable>();
+                sample_table->emplace(Dimension::k1d, 0);
+                sample_table->emplace(Dimension::k2d, 1);
+                sample_table->emplace(Dimension::k3d, 2);
+                sample_table->emplace(Dimension::kCube, 2);
+                sample_table->emplace(Dimension::k1dArray, 1);
+                sample_table->emplace(Dimension::k2dArray, 2);
+                table[32]  = sample_table;  // IMAGE_SAMPLE
+                table[34]  = sample_table;  // IMAGE_SAMPLE_D
+                table[37]  = sample_table;  // IMAGE_SAMPLE_B
+                table[40]  = sample_table;  // IMAGE_SAMPLE_C
+                table[42]  = sample_table;  // IMAGE_SAMPLE_C_D
+                table[45]  = sample_table;  // IMAGE_SAMPLE_C_B
+                table[48]  = sample_table;  // IMAGE_SAMPLE_O
+                table[50]  = sample_table;  // IMAGE_SAMPLE_D_O
+                table[53]  = sample_table;  // IMAGE_SAMPLE_B_O
+                table[56]  = sample_table;  // IMAGE_SAMPLE_C_O
+                table[58]  = sample_table;  // IMAGE_SAMPLE_C_D_O
+                table[61]  = sample_table;  // IMAGE_SAMPLE_C_B_O
+                table[104] = sample_table;  // IMAGE_SAMPLE_CD
+                table[106] = sample_table;  // IMAGE_SAMPLE_C_CD
+                table[108] = sample_table;  // IMAGE_SAMPLE_CD_O
+                table[110] = sample_table;  // IMAGE_SAMPLE_C_CD_O
+                table[162] = sample_table;  // IMAGE_SAMPLE_D_G16
+                table[170] = sample_table;  // IMAGE_SAMPLE_C_D_G16
+                table[178] = sample_table;  // IMAGE_SAMPLE_D_O_G16
+                table[186] = sample_table;  // IMAGE_SAMPLE_C_D_O_G16
+                table[232] = sample_table;  // IMAGE_SAMPLE_CD_G16
+                table[234] = sample_table;  // IMAGE_SAMPLE_C_CD_G16
+                table[236] = sample_table;  // IMAGE_SAMPLE_CD_O_G16
+                table[238] = sample_table;  // IMAGE_SAMPLE_C_CD_O_G16
+
+                // Define table for sample_l_cl instructions.
+                std::shared_ptr<DimensionToAcntTable> sample_l_cl_table = std::make_shared<DimensionToAcntTable>();
+                sample_l_cl_table->emplace(Dimension::k1d, 1);
+                sample_l_cl_table->emplace(Dimension::k2d, 2);
+                sample_l_cl_table->emplace(Dimension::k3d, 3);
+                sample_l_cl_table->emplace(Dimension::kCube, 3);
+                sample_l_cl_table->emplace(Dimension::k1dArray, 2);
+                sample_l_cl_table->emplace(Dimension::k2dArray, 3);
+                table[33]  = sample_l_cl_table;  // IMAGE_SAMPLE_CL
+                table[35]  = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL
+                table[36]  = sample_l_cl_table;  // IMAGE_SAMPLE_L
+                table[38]  = sample_l_cl_table;  // IMAGE_SAMPLE_B_CL
+                table[39]  = sample_l_cl_table;  // IMAGE_SAMPLE_LZ
+                table[41]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_CL
+                table[43]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL
+                table[44]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_L
+                table[46]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_B_CL
+                table[47]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_LZ
+                table[49]  = sample_l_cl_table;  // IMAGE_SAMPLE_CL_O
+                table[51]  = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_O
+                table[52]  = sample_l_cl_table;  // IMAGE_SAMPLE_L_O
+                table[54]  = sample_l_cl_table;  // IMAGE_SAMPLE_B_CL_O
+                table[55]  = sample_l_cl_table;  // IMAGE_SAMPLE_LZ_O
+                table[57]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_CL_O
+                table[59]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_O
+                table[60]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_L_O
+                table[62]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_B_CL_O
+                table[63]  = sample_l_cl_table;  // IMAGE_SAMPLE_C_LZ_O
+                table[105] = sample_l_cl_table;  // IMAGE_SAMPLE_CD_CL
+                table[107] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CD_CL
+                table[109] = sample_l_cl_table;  // IMAGE_SAMPLE_CD_CL_O
+                table[111] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CD_CL_O
+                table[163] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_G16
+                table[171] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_G16
+                table[179] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_O_G16
+                table[187] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_O_G16
+                table[233] = sample_l_cl_table;  // IMAGE_SAMPLE_CD_CL_G16
+                table[235] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CD_CL_G16
+                table[237] = sample_l_cl_table;  // IMAGE_SAMPLE_CD_CL_O_G16
+                table[239] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CD_CL_O_G16
+
+                // Define table for gather4 instruction.
+                std::shared_ptr<DimensionToAcntTable> gather4_table = std::make_shared<DimensionToAcntTable>();
+                gather4_table->emplace(Dimension::k2d, 1);
+                gather4_table->emplace(Dimension::k2dArray, 2);
+                gather4_table->emplace(Dimension::kCube, 2);
+                table[64] = gather4_table;  // IMAGE_GATHER4
+                table[69] = gather4_table;  // IMAGE_GATHER4_B
+                table[72] = gather4_table;  // IMAGE_GATHER4_C
+                table[77] = gather4_table;  // IMAGE_GATHER4_C_B
+                table[80] = gather4_table;  // IMAGE_GATHER4_O
+                table[85] = gather4_table;  // IMAGE_GATHER4_B_O
+                table[88] = gather4_table;  // IMAGE_GATHER4_C_O
+                table[93] = gather4_table;  // IMAGE_GATHER4_C_B_O
+                table[97] = gather4_table;  // IMAGE_GATHER4H
+                table[98] = gather4_table;  // IMAGE_GATHER4H_PCK
+
+                // Define table for gather4 instructions with lod and clamp.
+                std::shared_ptr<DimensionToAcntTable> gather4_l_cl_table = std::make_shared<DimensionToAcntTable>();
+                gather4_l_cl_table->emplace(Dimension::k2d, 2);
+                gather4_l_cl_table->emplace(Dimension::k2dArray, 3);
+                gather4_l_cl_table->emplace(Dimension::kCube, 3);
+                table[65] = gather4_l_cl_table;  // IMAGE_GATHER4_CL
+                table[68] = gather4_l_cl_table;  // IMAGE_GATHER4_L
+                table[70] = gather4_l_cl_table;  // IMAGE_GATHER4_B_CL
+                table[71] = gather4_l_cl_table;  // IMAGE_GATHER4_LZ
+                table[73] = gather4_l_cl_table;  // IMAGE_GATHER4_C_CL
+                table[76] = gather4_l_cl_table;  // IMAGE_GATHER4_C_L
+                table[78] = gather4_l_cl_table;  // IMAGE_GATHER4_C_B_CL
+                table[79] = gather4_l_cl_table;  // IMAGE_GATHER4_C_LZ
+                table[81] = gather4_l_cl_table;  // IMAGE_GATHER4_CL_O
+                table[84] = gather4_l_cl_table;  // IMAGE_GATHER4_L_O
+                table[86] = gather4_l_cl_table;  // IMAGE_GATHER4_B_CL_O
+                table[87] = gather4_l_cl_table;  // IMAGE_GATHER4_LZ_O
+                table[89] = gather4_l_cl_table;  // IMAGE_GATHER4_C_CL_O
+                table[92] = gather4_l_cl_table;  // IMAGE_GATHER4_C_L_O
+                table[94] = gather4_l_cl_table;  // IMAGE_GATHER4_C_B_CL_O
+                table[95] = gather4_l_cl_table;  // IMAGE_GATHER4_C_LZ_O
+
+                std::shared_ptr<DimensionToAcntTable> bvh_table = std::make_shared<DimensionToAcntTable>();
+                bvh_table->emplace(Dimension::k1d, 11);
+                bvh_table->emplace(Dimension::k2d, 11);
+                bvh_table->emplace(Dimension::k3d, 11);
+                bvh_table->emplace(Dimension::kCube, 11);
+                bvh_table->emplace(Dimension::k1dArray, 11);
+                bvh_table->emplace(Dimension::k2dArray, 11);
+                bvh_table->emplace(Dimension::k2dMsaa, 11);
+                bvh_table->emplace(Dimension::k2dMsaaArray, 11);
+                table[230] = bvh_table;  // IMAGE_BVH_INTERSECT_RAY
+                table[231] = bvh_table;  // IMAGE_BVH64_INTERSECT_RAY
+
+                // Address field information.
+                addr_fields[current_architecture] = {
+                    "VADDR", "VADDRA", "VADDRB", "VADDRC", "VADDRD", "VADDRE", "VADDRF", "VADDRG", "VADDRH", "VADDRI", "VADDRJ", "VADDRK", "VADDRL"};
+            }
+
+            // Generates Acnt information for RDNA 3 architecture.
+            void GenerateRdna3or3p5Table(GpuArchitecture architecture)
+            {
+                current_architecture = architecture;
+                tables[current_architecture]         = std::make_unique<AcntTable>();
+                AcntTable& table                     = *tables[current_architecture];
+
+                // Define table for msaa_load instructions.
+                std::shared_ptr<DimensionToAcntTable> msaa_load_table = std::make_shared<DimensionToAcntTable>();
+                msaa_load_table->emplace(Dimension::k2dMsaa, 2);
+                msaa_load_table->emplace(Dimension::k2dMsaaArray, 3);
+                // Map to relevant opcodes.
+                table[24] = msaa_load_table;
+
+                // Define table for msaa_load instructions.
+                std::shared_ptr<DimensionToAcntTable> load_store_table = std::make_shared<DimensionToAcntTable>();
+                load_store_table->emplace(Dimension::k1d, 0);
+                load_store_table->emplace(Dimension::k2d, 1);
+                load_store_table->emplace(Dimension::k3d, 2);
+                load_store_table->emplace(Dimension::kCube, 2);
+                load_store_table->emplace(Dimension::k1dArray, 1);
+                load_store_table->emplace(Dimension::k2dArray, 2);
+                load_store_table->emplace(Dimension::k2dMsaa, 2);
+                load_store_table->emplace(Dimension::k2dMsaaArray, 3);
+                table[0]  = load_store_table;  // IMAGE_LOAD
+                table[2]  = load_store_table;  // IMAGE_LOAD_PCK
+                table[3]  = load_store_table;  // IMAGE_LOAD_PCK_SGN
+                table[6]  = load_store_table;  // IMAGE_STORE
+                table[8]  = load_store_table;  // IMAGE_STORE_PCK
+
+                // Define table for atomic instructions.
+                std::shared_ptr<DimensionToAcntTable> atomic_table = std::make_shared<DimensionToAcntTable>();
+                atomic_table->emplace(Dimension::k1d, 0);
+                atomic_table->emplace(Dimension::k2d, 1);
+                atomic_table->emplace(Dimension::k3d, 2);
+                atomic_table->emplace(Dimension::k1dArray, 1);
+                atomic_table->emplace(Dimension::k2dArray, 2);
+                atomic_table->emplace(Dimension::k2dMsaa, 2);
+                atomic_table->emplace(Dimension::k2dMsaaArray, 3);
+                table[10] = atomic_table;  // IMAGE_ATOMIC_SWAP
+                table[11] = atomic_table;  // IMAGE_ATOMIC_CMPSWAP
+                table[12] = atomic_table;  // IMAGE_ATOMIC_ADD
+                table[13] = atomic_table;  // IMAGE_ATOMIC_SUB
+                table[14] = atomic_table;  // IMAGE_ATOMIC_SMIN
+                table[15] = atomic_table;  // IMAGE_ATOMIC_UMIN
+                table[16] = atomic_table;  // IMAGE_ATOMIC_SMAX
+                table[17] = atomic_table;  // IMAGE_ATOMIC_UMAX
+                table[18] = atomic_table;  // IMAGE_ATOMIC_AND
+                table[19] = atomic_table;  // IMAGE_ATOMIC_OR
+                table[20] = atomic_table;  // IMAGE_ATOMIC_XOR
+                table[21] = atomic_table;  // IMAGE_ATOMIC_INC
+                table[22] = atomic_table;  // IMAGE_ATOMIC_DEC
+
+                // Define table for load_mip/store_mip instructions.
+                std::shared_ptr<DimensionToAcntTable> ls_mip_table = std::make_shared<DimensionToAcntTable>();
+                ls_mip_table->emplace(Dimension::k1d, 1);
+                ls_mip_table->emplace(Dimension::k2d, 2);
+                ls_mip_table->emplace(Dimension::k3d, 3);
+                ls_mip_table->emplace(Dimension::kCube, 3);
+                ls_mip_table->emplace(Dimension::k1dArray, 2);
+                ls_mip_table->emplace(Dimension::k2dArray, 3);
+                table[1] = ls_mip_table;  // IMAGE_LOAD_MIP
+                table[4] = ls_mip_table;  // IMAGE_LOAD_MIP_PCK
+                table[5] = ls_mip_table;  // IMAGE_LOAD_MIP_PCK_SGN
+                table[7] = ls_mip_table;  // IMAGE_STORE_MIP
+                table[9] = ls_mip_table;  // IMAGE_STORE_MIP_PCK
+
+                // Define table for sample instructions.
+                std::shared_ptr<DimensionToAcntTable> sample_table = std::make_shared<DimensionToAcntTable>();
+                sample_table->emplace(Dimension::k1d, 0);
+                sample_table->emplace(Dimension::k2d, 1);
+                sample_table->emplace(Dimension::k3d, 2);
+                sample_table->emplace(Dimension::kCube, 2);
+                sample_table->emplace(Dimension::k1dArray, 1);
+                sample_table->emplace(Dimension::k2dArray, 2);
+                table[27] = sample_table;  // IMAGE_SAMPLE
+                table[28] = sample_table;  // IMAGE_SAMPLE_D
+                table[30] = sample_table;  // IMAGE_SAMPLE_B
+                table[32] = sample_table;  // IMAGE_SAMPLE_C
+                table[33] = sample_table;  // IMAGE_SAMPLE_C_D
+                table[35] = sample_table;  // IMAGE_SAMPLE_C_B
+                table[37] = sample_table;  // IMAGE_SAMPLE_O
+                table[38] = sample_table;  // IMAGE_SAMPLE_D_O
+                table[40] = sample_table;  // IMAGE_SAMPLE_B_O
+                table[42] = sample_table;  // IMAGE_SAMPLE_C_O
+                table[43] = sample_table;  // IMAGE_SAMPLE_C_D_O
+                table[45] = sample_table;  // IMAGE_SAMPLE_C_B_O
+                table[57] = sample_table;  // IMAGE_SAMPLE_D_G16
+                table[58] = sample_table;  // IMAGE_SAMPLE_C_D_G16
+                table[59] = sample_table;  // IMAGE_SAMPLE_D_O_G16
+                table[60] = sample_table;  // IMAGE_SAMPLE_C_D_O_G16
+
+                // Define table for sample_l_cl instructions.
+                std::shared_ptr<DimensionToAcntTable> sample_l_cl_table = std::make_shared<DimensionToAcntTable>();
+                sample_l_cl_table->emplace(Dimension::k1d, 1);
+                sample_l_cl_table->emplace(Dimension::k2d, 2);
+                sample_l_cl_table->emplace(Dimension::k3d, 3);
+                sample_l_cl_table->emplace(Dimension::kCube, 3);
+                sample_l_cl_table->emplace(Dimension::k1dArray, 2);
+                sample_l_cl_table->emplace(Dimension::k2dArray, 3);
+                table[29] = sample_l_cl_table;  // IMAGE_SAMPLE_L
+                table[31] = sample_l_cl_table;  // IMAGE_SAMPLE_LZ
+                table[34] = sample_l_cl_table;  // IMAGE_SAMPLE_C_L
+                table[36] = sample_l_cl_table;  // IMAGE_SAMPLE_C_LZ
+                table[39] = sample_l_cl_table;  // IMAGE_SAMPLE_L_O
+                table[41] = sample_l_cl_table;  // IMAGE_SAMPLE_LZ_O
+                table[44] = sample_l_cl_table;  // IMAGE_SAMPLE_C_L_O
+                table[46] = sample_l_cl_table;  // IMAGE_SAMPLE_C_LZ_O
+                table[64] = sample_l_cl_table;  // IMAGE_SAMPLE_CL
+                table[65] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL
+                table[66] = sample_l_cl_table;  // IMAGE_SAMPLE_B_CL
+                table[67] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CL
+                table[68] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL
+                table[69] = sample_l_cl_table;  // IMAGE_SAMPLE_C_B_CL
+                table[70] = sample_l_cl_table;  // IMAGE_SAMPLE_CL_O
+                table[71] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_O
+                table[72] = sample_l_cl_table;  // IMAGE_SAMPLE_B_CL_O
+                table[73] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CL_O
+                table[74] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_O
+                table[75] = sample_l_cl_table;  // IMAGE_SAMPLE_C_B_CL_O
+                table[84] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_G16
+                table[85] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_O_G16
+                table[86] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_O_G16
+                table[95] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_G16
+
+                // Define table for gather4 instruction.
+                std::shared_ptr<DimensionToAcntTable> gather4_table = std::make_shared<DimensionToAcntTable>();
+                gather4_table->emplace(Dimension::k2d, 1);
+                gather4_table->emplace(Dimension::k2dArray, 2);
+                gather4_table->emplace(Dimension::kCube, 2);
+                table[47]  = gather4_table;  // IMAGE_GATHER4
+                table[49]  = gather4_table;  // IMAGE_GATHER4_B
+                table[51]  = gather4_table;  // IMAGE_GATHER4_C
+                table[53]  = gather4_table;  // IMAGE_GATHER4_O
+                table[100] = gather4_table;  // IMAGE_GATHER4_C_B
+                table[144] = gather4_table;  // IMAGE_GATHER4H
+
+                // Define table for gather4 instructions with lod and clamp.
+                std::shared_ptr<DimensionToAcntTable> gather4_l_cl_table = std::make_shared<DimensionToAcntTable>();
+                gather4_l_cl_table->emplace(Dimension::k2d, 2);
+                gather4_l_cl_table->emplace(Dimension::k2dArray, 3);
+                gather4_l_cl_table->emplace(Dimension::kCube, 3);
+                table[48]  = gather4_l_cl_table;  // IMAGE_GATHER4_L
+                table[50]  = gather4_l_cl_table;  // IMAGE_GATHER4_LZ
+                table[52]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_LZ
+                table[54]  = gather4_l_cl_table;  // IMAGE_GATHER4_LZ_O
+                table[55]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_LZ_O
+                table[96]  = gather4_l_cl_table;  // IMAGE_GATHER4_CL
+                table[97]  = gather4_l_cl_table;  // IMAGE_GATHER4_B_CL
+                table[98]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_CL
+                table[99]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_L
+                table[101] = gather4_l_cl_table;  // IMAGE_GATHER4_C_B_CL
+
+                // Address field information.
+                addr_fields[current_architecture] = {
+                    "VADDR", "VADDRA", "VADDRB", "VADDRC", "VADDRD"};
+            }
+
+            // Generates Acnt information for RDNA 4 architecture.
+            void GenerateRdna4Table()
+            {
+                current_architecture = GpuArchitecture::kRdna4;
+                tables[current_architecture]         = std::make_unique<AcntTable>();
+                AcntTable& table                     = *tables[current_architecture];
+
+                // Define table for msaa_load instructions.
+                std::shared_ptr<DimensionToAcntTable> load_store_table = std::make_shared<DimensionToAcntTable>();
+                load_store_table->emplace(Dimension::k1d, 0);
+                load_store_table->emplace(Dimension::k2d, 1);
+                load_store_table->emplace(Dimension::k3d, 2);
+                load_store_table->emplace(Dimension::kCube, 2);
+                load_store_table->emplace(Dimension::k1dArray, 1);
+                load_store_table->emplace(Dimension::k2dArray, 2);
+                load_store_table->emplace(Dimension::k2dMsaa, 2);
+                load_store_table->emplace(Dimension::k2dMsaaArray, 3);
+                table[0]  = load_store_table;  // IMAGE_LOAD
+                table[2]  = load_store_table;  // IMAGE_LOAD_PCK
+                table[3]  = load_store_table;  // IMAGE_LOAD_PCK_SGN
+                table[6]  = load_store_table;  // IMAGE_STORE
+                table[8]  = load_store_table;  // IMAGE_STORE_PCK
+
+                // Define table for atomic instructions.
+                std::shared_ptr<DimensionToAcntTable> atomic_table = std::make_shared<DimensionToAcntTable>();
+                atomic_table->emplace(Dimension::k1d, 0);
+                atomic_table->emplace(Dimension::k2d, 1);
+                atomic_table->emplace(Dimension::k3d, 2);
+                atomic_table->emplace(Dimension::k1dArray, 1);
+                atomic_table->emplace(Dimension::k2dArray, 2);
+                atomic_table->emplace(Dimension::k2dMsaa, 2);
+                atomic_table->emplace(Dimension::k2dMsaaArray, 3);
+                table[10]  = atomic_table;  // IMAGE_ATOMIC_SWAP
+                table[11]  = atomic_table;  // IMAGE_ATOMIC_CMPSWAP
+                table[12]  = atomic_table;  // IMAGE_ATOMIC_ADD_UINT
+                table[13]  = atomic_table;  // IMAGE_ATOMIC_SUB_UINT
+                table[14]  = atomic_table;  // IMAGE_ATOMIC_MIN_INT
+                table[15]  = atomic_table;  // IMAGE_ATOMIC_MIN_UINT
+                table[16]  = atomic_table;  // IMAGE_ATOMIC_MAX_INT
+                table[17]  = atomic_table;  // IMAGE_ATOMIC_MAX_UINT
+                table[18]  = atomic_table;  // IMAGE_ATOMIC_AND
+                table[19]  = atomic_table;  // IMAGE_ATOMIC_OR
+                table[20]  = atomic_table;  // IMAGE_ATOMIC_XOR
+                table[21]  = atomic_table;  // IMAGE_ATOMIC_INC_UINT
+                table[22]  = atomic_table;  // IMAGE_ATOMIC_DEC_UINT
+                table[131] = atomic_table;  // IMAGE_ATOMIC_ADD_FLT
+                table[132] = atomic_table;  // IMAGE_ATOMIC_MIN_FLT
+                table[133] = atomic_table;  // IMAGE_ATOMIC_MAX_FLT
+                table[134] = atomic_table;  // IMAGE_ATOMIC_PK_ADD_F16
+                table[135] = atomic_table;  // IMAGE_ATOMIC_PK_ADD_BF16
+
+                // Define table for load_mip/store_mip instructions.
+                std::shared_ptr<DimensionToAcntTable> ls_mip_table = std::make_shared<DimensionToAcntTable>();
+                ls_mip_table->emplace(Dimension::k1d, 1);
+                ls_mip_table->emplace(Dimension::k2d, 2);
+                ls_mip_table->emplace(Dimension::k3d, 3);
+                ls_mip_table->emplace(Dimension::kCube, 3);
+                ls_mip_table->emplace(Dimension::k1dArray, 2);
+                ls_mip_table->emplace(Dimension::k2dArray, 3);
+                table[1] = ls_mip_table;  // IMAGE_LOAD_MIP
+                table[4] = ls_mip_table;  // IMAGE_LOAD_MIP_PCK
+                table[5] = ls_mip_table;  // IMAGE_LOAD_MIP_PCK_SGN
+                table[7] = ls_mip_table;  // IMAGE_STORE_MIP
+                table[9] = ls_mip_table;  // IMAGE_STORE_MIP_PCK
+
+                // Define table for sample instructions.
+                std::shared_ptr<DimensionToAcntTable> sample_table = std::make_shared<DimensionToAcntTable>();
+                sample_table->emplace(Dimension::k1d, 0);
+                sample_table->emplace(Dimension::k2d, 1);
+                sample_table->emplace(Dimension::k3d, 2);
+                sample_table->emplace(Dimension::kCube, 2);
+                sample_table->emplace(Dimension::k1dArray, 1);
+                sample_table->emplace(Dimension::k2dArray, 2);
+                table[27] = sample_table;  // IMAGE_SAMPLE
+                table[28] = sample_table;  // IMAGE_SAMPLE_D
+                table[30] = sample_table;  // IMAGE_SAMPLE_B
+                table[32] = sample_table;  // IMAGE_SAMPLE_C
+                table[33] = sample_table;  // IMAGE_SAMPLE_C_D
+                table[35] = sample_table;  // IMAGE_SAMPLE_C_B
+                table[37] = sample_table;  // IMAGE_SAMPLE_O
+                table[38] = sample_table;  // IMAGE_SAMPLE_D_O
+                table[40] = sample_table;  // IMAGE_SAMPLE_B_O
+                table[42] = sample_table;  // IMAGE_SAMPLE_C_O
+                table[43] = sample_table;  // IMAGE_SAMPLE_C_D_O
+                table[45] = sample_table;  // IMAGE_SAMPLE_C_B_O
+                table[57] = sample_table;  // IMAGE_SAMPLE_D_G16
+                table[58] = sample_table;  // IMAGE_SAMPLE_C_D_G16
+                table[59] = sample_table;  // IMAGE_SAMPLE_D_O_G16
+                table[60] = sample_table;  // IMAGE_SAMPLE_C_D_O_G16
+
+
+                // Define table for sample_l_cl instructions.
+                std::shared_ptr<DimensionToAcntTable> sample_l_cl_table = std::make_shared<DimensionToAcntTable>();
+                sample_l_cl_table->emplace(Dimension::k1d, 1);
+                sample_l_cl_table->emplace(Dimension::k2d, 2);
+                sample_l_cl_table->emplace(Dimension::k3d, 3);
+                sample_l_cl_table->emplace(Dimension::kCube, 3);
+                sample_l_cl_table->emplace(Dimension::k1dArray, 2);
+                sample_l_cl_table->emplace(Dimension::k2dArray, 3);
+                table[29] = sample_l_cl_table;  // IMAGE_SAMPLE_L
+                table[31] = sample_l_cl_table;  // IMAGE_SAMPLE_LZ
+                table[34] = sample_l_cl_table;  // IMAGE_SAMPLE_C_L
+                table[36] = sample_l_cl_table;  // IMAGE_SAMPLE_C_LZ
+                table[39] = sample_l_cl_table;  // IMAGE_SAMPLE_L_O
+                table[41] = sample_l_cl_table;  // IMAGE_SAMPLE_LZ_O
+                table[44] = sample_l_cl_table;  // IMAGE_SAMPLE_C_L_O
+                table[46] = sample_l_cl_table;  // IMAGE_SAMPLE_C_LZ_O
+                table[64] = sample_l_cl_table;  // IMAGE_SAMPLE_CL
+                table[65] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL
+                table[66] = sample_l_cl_table;  // IMAGE_SAMPLE_B_CL
+                table[67] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CL
+                table[68] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL
+                table[69] = sample_l_cl_table;  // IMAGE_SAMPLE_C_B_CL
+                table[70] = sample_l_cl_table;  // IMAGE_SAMPLE_CL_O
+                table[71] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_O
+                table[72] = sample_l_cl_table;  // IMAGE_SAMPLE_B_CL_O
+                table[73] = sample_l_cl_table;  // IMAGE_SAMPLE_C_CL_O
+                table[74] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_O
+                table[75] = sample_l_cl_table;  // IMAGE_SAMPLE_C_B_CL_O
+                table[84] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_G16
+                table[85] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_O_G16
+                table[86] = sample_l_cl_table;  // IMAGE_SAMPLE_C_D_CL_O_G16
+                table[95] = sample_l_cl_table;  // IMAGE_SAMPLE_D_CL_G16
+
+                // Define table for gather4 instruction.
+                std::shared_ptr<DimensionToAcntTable> gather4_table = std::make_shared<DimensionToAcntTable>();
+                gather4_table->emplace(Dimension::k2d, 1);
+                gather4_table->emplace(Dimension::k2dArray, 2);
+                gather4_table->emplace(Dimension::kCube, 2);
+                table[47]  = gather4_table;  // IMAGE_GATHER4
+                table[49]  = gather4_table;  // IMAGE_GATHER4_B
+                table[51]  = gather4_table;  // IMAGE_GATHER4_C
+                table[53]  = gather4_table;  // IMAGE_GATHER4_O
+                table[100] = gather4_table;  // IMAGE_GATHER4_C_B
+                table[144] = gather4_table;  // IMAGE_GATHER4H
+
+                // Define table for gather4 instructions with lod and clamp.
+                std::shared_ptr<DimensionToAcntTable> gather4_l_cl_table = std::make_shared<DimensionToAcntTable>();
+                gather4_l_cl_table->emplace(Dimension::k2d, 2);
+                gather4_l_cl_table->emplace(Dimension::k2dArray, 3);
+                gather4_l_cl_table->emplace(Dimension::kCube, 3);
+                table[48]  = gather4_l_cl_table;  // IMAGE_GATHER4_L
+                table[50]  = gather4_l_cl_table;  // IMAGE_GATHER4_LZ
+                table[52]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_LZ
+                table[54]  = gather4_l_cl_table;  // IMAGE_GATHER4_LZ_O
+                table[55]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_LZ_O
+                table[96]  = gather4_l_cl_table;  // IMAGE_GATHER4_CL
+                table[97]  = gather4_l_cl_table;  // IMAGE_GATHER4_B_CL
+                table[98]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_CL
+                table[99]  = gather4_l_cl_table;  // IMAGE_GATHER4_C_L
+                table[101] = gather4_l_cl_table;  // IMAGE_GATHER4_C_B_CL
+
+                // Address field information.
+                addr_fields[current_architecture] = {
+                    "VADDR0", "VADDR1", "VADDR2", "VADDR3", "VADDR4"};
+            }
+            AcntHandler() = default;
+
+            int32_t GetAcnt(uint64_t opcode, uint64_t dim) const
+            {
+                assert(current_architecture != GpuArchitecture::kUnknown);
+                assert(tables.count(current_architecture) > 0);
+                AcntTable&  table      = *tables.at(current_architecture);
+                int32_t     ret        = -1;
+                const auto& table_iter = table.find(opcode);
+                if (table_iter != table.end())
+                {
+                    const auto& acnt_iter = table_iter->second->find(static_cast<Dimension>(dim));
+                    if (acnt_iter != table_iter->second->end())
+                    {
+                        ret = acnt_iter->second;
+                    }
+                }
+                return ret;
+            }
+
+            // Maps opcode to the DIM to Acnt table.
+            using AcntTable = std::unordered_map<uint64_t, std::shared_ptr<DimensionToAcntTable>>;
+            std::unordered_map<GpuArchitecture, std::unique_ptr<AcntTable>> tables;
+
+            // Arch ID to address fields information.
+            std::unordered_map<GpuArchitecture, std::vector<std::string>> addr_fields;
+
+            // Architecture.
+            GpuArchitecture current_architecture = GpuArchitecture::kUnknown;
+        };
+
+        static int32_t GetAcnt(const std::vector<uint32_t>& machine_code,
+                               const MicrocodeFormat& microcode_format,
+                               const AcntHandler& mimg_acnt_table,
+                               std::vector<std::string>& error_log)
+        {
+            uint64_t opcode = 0;
+            uint64_t dim    = 0;
+            GetFieldIterator(machine_code, "OP", microcode_format, opcode, error_log);
+            GetFieldIterator(machine_code, "DIM", microcode_format, dim, error_log);
+            return mimg_acnt_table.GetAcnt(opcode, dim);
+        }
+
+        static std::string GetNameAsList(const std::vector<uint32_t>& machine_code,
+                                         const MicrocodeFormat& microcode_format,
+                                         const std::vector<PredefinedValue>& predefined_values,
+                                         const AcntHandler& mimg_acnt_table,
+                                         const GpuArchitecture& architecture,
+                                         std::vector<std::string>& error_log)
+        {
+            std::string ret = "[";
+            int32_t acnt = mimg_workaround::GetAcnt(machine_code, microcode_format, mimg_acnt_table, error_log);
+            if (acnt > 0)
+            {
+                for (uint32_t i = 0; i <= static_cast<uint32_t>(acnt); i++)
+                {
+                    std::string addr_field = mimg_acnt_table.addr_fields.at(architecture)[i];
+                    uint64_t    addr_reg   = 0;
+                    GetFieldIterator(machine_code, addr_field, microcode_format, addr_reg, error_log);
+                    const auto& predefined_value_iterator =
+                        std::find_if(predefined_values.begin(), predefined_values.end(), [&](const PredefinedValue& predefined_value) {
+                            return predefined_value.value == addr_reg;
+                        });
+                    if (predefined_value_iterator != predefined_values.end())
+                    {
+                        ret += predefined_value_iterator->name + ", ";
+                    }
+                }
+                if (ret.size() > 2)
+                {
+                    ret.erase(ret.size() - 2);
+                }
+                ret += "]";
+            }
+            else
+            {
+                error_log.push_back(kStringErrorFailedToGetAddressCount);
+            }
+            return ret;
+        }
+    }  // namespace mimg_workaround
+
     class MachineCodeStream
     {
     public:
@@ -158,46 +893,6 @@ namespace amdisa
         bool                 is_empty_ = true;
     };
 
-    static uint64_t GetFieldValue(const Field& field, const std::vector<uint32_t>& working_dwords, std::vector<std::string>& log)
-    {
-        Range    range;
-        uint64_t field_value = 0;
-        if (AmdIsaUtility::GetRange(field, range))
-        {
-            uint64_t bit_count   = range.bit_count;
-            uint64_t bit_offset  = range.bit_offset;
-            uint64_t dword_index = bit_offset / 32;
-            uint32_t dword       = 0;
-            if (dword_index < working_dwords.size())
-            {
-                dword = working_dwords[dword_index];
-            }
-            else
-            {
-                log.push_back(kStringWarningOutRangeDwordAccess);
-            }
-            uint64_t mask = ((1ULL << bit_count) - 1);
-            field_value   = (dword >> (bit_offset - 32 * dword_index)) & mask;
-            if (!AmdIsaUtility::GetRange(field, range))
-            {
-                log.push_back(kStringErrorEmptyRange);
-                assert(false);
-            }
-            uint64_t padding_size = range.padding.bit_count;
-            if (padding_size > 0)
-            {
-                uint32_t padding_value = range.padding.value;
-                field_value            = (field_value << padding_size) | padding_value;
-            }
-        }
-        else
-        {
-            log.push_back(kStringErrorEmptyRange);
-            assert(false);
-        }
-        return field_value;
-    }
-
     static void RetrieveFieldInfo(const std::vector<uint32_t>& working_dwords,
                                   const std::vector<Field>&    bitmap,
                                   InstructionInfo&             instruction_info,
@@ -207,7 +902,7 @@ namespace amdisa
         for (const auto& field : bitmap)
         {
             Range range;
-            if (AmdIsaUtility::GetRange(field, range))
+            if (AmdIsaUtility::GetRange(field, range, 0))
             {
                 instruction_info.encoding_fields.push_back(EncodingField());
                 auto&    encoding_field = instruction_info.encoding_fields.back();
@@ -311,31 +1006,6 @@ namespace amdisa
         return std::find_if(microcode.bit_map.begin(), microcode.bit_map.end(), [&](const Field& field) { return field.name == field_name; });
     }
 
-    // Gets the iterator to the field from the bitmap with a specific name and gets the value of
-    // the field from the machine code.
-    static FieldIterator GetFieldIterator(const std::vector<uint32_t>& machine_code,
-                                          const std::string&           field_name,
-                                          const MicrocodeFormat&       microcode_format,
-                                          uint64_t&                    field_value,
-                                          std::vector<std::string>&    log)
-    {
-        FieldIterator found_field    = microcode_format.bit_map.end();
-        bool          is_field_found = field_name.empty();
-
-        // Go over each field in the passed microcode format structure.
-        for (auto field_iterator = microcode_format.bit_map.begin(); !is_field_found && field_iterator != microcode_format.bit_map.end(); ++field_iterator)
-        {
-            if (field_iterator->name.find(field_name) != std::string::npos)
-            {
-                is_field_found = true;
-                field_value    = GetFieldValue(*field_iterator, machine_code, log);
-                found_field    = field_iterator;
-            }
-        }
-
-        return found_field;
-    }
-
     static std::string GetNameAsRegisterRange(const std::string& operand_name, uint32_t operand_size)
     {
         std::stringstream reg_name_formatter;
@@ -354,7 +1024,12 @@ namespace amdisa
         return reg_name_formatter.str();
     }
 
-    static std::string GeneratePartitionedOperand(const amdisa::MicrocodeFormat& microcode_format, const uint32_t field_value, std::vector<std::string>& log)
+    static const std::map<std::string, std::string> kVersionMap = {
+        {"uc_version_gfx10", "RDNA1"},
+        {"uc_version_gfx11", "RDNA3"},
+        {"uc_version_gfx12", "RDNA4"}
+    };
+    static std::string GeneratePartitionedOperand(const std::string inst_name, const amdisa::MicrocodeFormat& microcode_format, const uint32_t field_value, std::vector<std::string>& log)
     {
         std::stringstream ret;
         ret << "{ ";
@@ -362,6 +1037,10 @@ namespace amdisa
         // Package field value for the use with GetFieldValue function.
         std::vector<uint32_t> working_dword;
         working_dword.push_back(field_value);
+        std::map<std::string, std::string> partitioned_values;
+        std::map<std::string, uint64_t>    partitioned_int_values;
+        std::map<std::string, uint64_t>    partitioned_field_sizes;
+        std::stringstream                  bitmap_to_str;
         for (const auto& field : microcode_format.bit_map)
         {
             ret << field.name << ":";
@@ -377,15 +1056,112 @@ namespace amdisa
                 if (has_predefined_value)
                 {
                     ret << predefined_value_iterator->name << "; ";
+                    partitioned_values[field.name] = predefined_value_iterator->name;
                 }
             }
 
             if (!has_predefined_value)
             {
                 ret << subvalue << "; ";
+                partitioned_values[field.name] = std::to_string(subvalue);
             }
+
+            // Save values for reformatting.
+            partitioned_int_values[field.name] = subvalue;
+            uint32_t total_bit_count           = 0;
+            for (const auto& range : field.ranges)
+            {
+                total_bit_count += range.bit_count;
+            }
+            partitioned_field_sizes[field.name] = total_bit_count;
+            if (!bitmap_to_str.str().empty())
+            {
+                bitmap_to_str << " | ";
+            }
+            bitmap_to_str << field.name << "=" << (has_predefined_value ? partitioned_values[field.name] : std::to_string(subvalue));
         }
         ret << "}";
+
+        // Reformat for better readability.
+        // 1. Constant cases.
+        if (partitioned_values.size() == 1 && partitioned_values.count("VALUE") > 0)
+        {
+            ret.str("");
+            ret << "0x" << std::hex << std::stol(partitioned_values["VALUE"]);
+        }
+        // 2. s_version instruction case.
+        else if ((inst_name.compare("S_VERSION") == 0) && partitioned_values.size() == 4 && partitioned_values.count("VERSION") > 0 &&
+                 partitioned_values.count("W32") > 0)
+        {
+            ret.str("");
+            std::string version = partitioned_values.at("VERSION");
+            if (kVersionMap.count(version) > 0)
+            {
+                version = kVersionMap.at(version);
+            }
+            ret << "Architecture=" << version << " | WaveSize=";
+            if (partitioned_values.at("W32") == "1")
+            {
+                // Wavesize=32.
+                ret << 32;
+            }
+            else
+            {
+                // Wavesize=64.
+                ret << 64;
+            }
+        }
+        // 3. s_waitcnt instruction case.
+        else if ((inst_name.compare("S_WAITCNT") == 0) && partitioned_values.size() == 3 && partitioned_values.count("LGKM") > 0)
+        {
+            std::stringstream counter_stream;
+            for (const auto& value_info : partitioned_int_values)
+            {
+                uint64_t field_size = partitioned_field_sizes.at(value_info.first);
+                uint64_t value      = partitioned_int_values.at(value_info.first);
+                uint64_t max_value  = (1ULL << field_size) - 1;
+
+                if (value < max_value)
+                {
+                    counter_stream << value_info.first << "cnt==" << value_info.second << ", ";
+                }
+            }
+            std::string counter_str = counter_stream.str();
+            if (counter_str.size() >= 2)
+            {
+                counter_str.erase(counter_str.size() - 2);
+            }
+            ret.str("");
+            ret << counter_str;
+        }
+        // 4. s_waitcnt_depctr instruction case.
+        else if ((inst_name.compare("S_WAITCNT_DEPCTR") == 0) && partitioned_values.size() == 7)
+        {
+            std::stringstream counter_stream;
+            counter_stream << "{ ";
+            for (auto value_info = partitioned_int_values.begin(); value_info != partitioned_int_values.end(); value_info++)
+            {
+                uint64_t field_size = partitioned_field_sizes.at(value_info->first);
+                uint64_t value      = partitioned_int_values.at(value_info->first);
+                uint64_t max_value  = (1ULL << field_size) - 1;
+
+                if (value < max_value)
+                {
+                    counter_stream << ((counter_stream.str().size() > 2 || value_info == std::prev(partitioned_int_values.end())) ? ", " : "");
+                    counter_stream << value_info->first << ":" << value_info->second;
+                }
+            }
+            counter_stream << " }";
+            ret.str("");
+            ret << counter_stream.str();
+        }
+        // 5. s_clause and s_delay_alu instruction case.
+        else if ((inst_name.compare("S_CLAUSE") == 0) || (inst_name.compare("S_DELAY_ALU") == 0))
+        {
+            ret.str("");
+            ret << bitmap_to_str.str();
+        }
+
         return ret.str();
     }
 
@@ -520,6 +1296,16 @@ namespace amdisa
                             encoding_name = encoding_name.substr(4);
                         }
                         encoding_name += "_" + inst_enc_ptr->condition_name;
+
+                        if (is_vopdx)
+                        {
+                            encoding_name = "VOPDX_" + encoding_name;
+                        }
+                        else if (is_vopdy)
+                        {
+                            encoding_name = "VOPDY_" + encoding_name;
+                        }
+
                         if (conditions.find(encoding_name) != conditions.end())
                         {
                             auto& IsEncodingMatch = conditions.at(encoding_name);
@@ -538,114 +1324,60 @@ namespace amdisa
         return found_ptrs;
     }
 
-    static void GetFunctionalGroupSubgroupInfo(InstructionInfo& info, const std::string& functional_group, const std::string& functional_subgroup)
+    static std::map<std::string, FunctionalGroups> FunctionalGroupsNameMap = {{"SALU", FunctionalGroups::kFunctionalGroupSalu},
+                                                                             {"SMEM", FunctionalGroups::kFunctionalGroupSmem},
+                                                                             {"VALU", FunctionalGroups::kFunctionalGroupValu},
+                                                                             {"VMEM", FunctionalGroups::kFunctionalGroupVmem},
+                                                                             {"EXPORT", FunctionalGroups::kFunctionalGroupExport},
+                                                                             {"BRANCH", FunctionalGroups::kFunctionalGroupBranch},
+                                                                             {"MESSAGE", FunctionalGroups::kFunctionalGroupMessage},
+                                                                             {"WAVE_CONTROL", FunctionalGroups::kFunctionalGroupWaveControl},
+                                                                             {"TRAP", FunctionalGroups::kFunctionalGroupTrap}};
+
+    static FunctionalGroups FunctionalGroupNameToEnum(std::string functional_group)
+    {
+        FunctionalGroups functional_group_enum = FunctionalGroups::kFunctionalGroupUnknown;
+        if (FunctionalGroupsNameMap.find(functional_group) != FunctionalGroupsNameMap.end())
+        {
+            functional_group_enum = FunctionalGroupsNameMap[functional_group];
+        }
+        return functional_group_enum;
+    }
+
+    static std::map<std::string, FunctionalSubgroups> FunctionalSubgroupsNameMap = {{"FLOATING_POINT", FunctionalSubgroups::kFunctionalSubgroupFloatingPoint},
+                                                                                   {"BUFFER", FunctionalSubgroups::kFunctionalSubgroupBuffer},
+                                                                                   {"TEXTURE", FunctionalSubgroups::kFunctionalSubgroupTexture},
+                                                                                   {"LOAD", FunctionalSubgroups::kFunctionalSubgroupLoad},
+                                                                                   {"STORE", FunctionalSubgroups::kFunctionalSubgroupStore},
+                                                                                   {"SAMPLE", FunctionalSubgroups::kFunctionalSubgroupSample},
+                                                                                   {"BVH", FunctionalSubgroups::kFunctionalSubgroupBvh},
+                                                                                   {"ATOMIC", FunctionalSubgroups::kFunctionalSubgroupAtomic},
+                                                                                   {"FLAT", FunctionalSubgroups::kFunctionalSubgroupFlat},
+                                                                                   {"DATA_SHARE", FunctionalSubgroups::kFunctionalSubgroupDataShare},
+                                                                                   {"STATIC", FunctionalSubgroups::kFunctionalSubgroupStatic},
+                                                                                   {"MFMA", FunctionalSubgroups::kFunctionalSubgroupMFMA},
+                                                                                   {"WMMA", FunctionalSubgroups::kFunctionalSubgroupWMMA},
+                                                                                   {"TRANSCENDENTAL", FunctionalSubgroups::kFunctionalSubgroupTranscendental}};
+
+    static FunctionalSubgroups FunctionalSubgroupNameToEnum(std::string functional_subgroup)
+    {
+        FunctionalSubgroups functional_subgroup_enum = FunctionalSubgroups::kFunctionalSubgroupUnknown;
+        if (FunctionalSubgroupsNameMap.find(functional_subgroup) != FunctionalSubgroupsNameMap.end())
+        {
+            functional_subgroup_enum = FunctionalSubgroupsNameMap[functional_subgroup];
+        }
+        return functional_subgroup_enum;
+    }
+
+    static void GetFunctionalGroupSubgroupInfo(InstructionInfo& info, const std::string& functional_group, const std::vector<std::string>& functional_subgroup)
     {
         // Assign functional group enum
-        if (functional_group.compare("SALU") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupSalu;
-        }
-        else if (functional_group.compare("SMEM") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupSmem;
-        }
-        else if (functional_group.compare("VALU") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupValu;
-        }
-        else if (functional_group.compare("VMEM") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupVmem;
-        }
-        else if (functional_group.compare("EXPORT") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupExport;
-        }
-        else if (functional_group.compare("BRANCH") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupBranch;
-        }
-        else if (functional_group.compare("MESSAGE") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupMessage;
-        }
-        else if (functional_group.compare("WAVE_CONTROL") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupWaveControl;
-        }
-        else if (functional_group.compare("TRAP") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupTrap;
-        }
-        else if (functional_group.compare("VALU") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupValu;
-        }
-        else
-        {
-            info.functional_group_subgroup_info.IsaFunctionalGroup = kFunctionalGroup::kFunctionalGroupUnknown;
-        }
+        info.functional_group_subgroup_info.isa_functional_group = FunctionalGroupNameToEnum(functional_group);
 
         // Assign functional subgroup enum
-        if (functional_subgroup.compare("FLOATING_POINT") == 0)
+        for (const auto& subgroup : functional_subgroup)
         {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupFloatingPoint;
-        }
-        else if (functional_subgroup.compare("BUFFER") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupBuffer;
-        }
-        else if (functional_subgroup.compare("TEXTURE") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupTexture;
-        }
-        else if (functional_subgroup.compare("LOAD") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupLoad;
-        }
-        else if (functional_subgroup.compare("STORE") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupStore;
-        }
-        else if (functional_subgroup.compare("SAMPLE") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupSample;
-        }
-        else if (functional_subgroup.compare("BVH") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupBvh;
-        }
-        else if (functional_subgroup.compare("ATOMIC") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupAtomic;
-        }
-        else if (functional_subgroup.compare("FLAT") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupFlat;
-        }
-        else if (functional_subgroup.compare("DATA_SHARE") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupDataShare;
-        }
-        else if (functional_subgroup.compare("STATIC") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupStatic;
-        }
-        else if (functional_subgroup.compare("MFMA") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupMFMA;
-        }
-        else if (functional_subgroup.compare("WMMA") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupWMMA;
-        }
-        else if (functional_subgroup.compare("TRANS") == 0)
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupTranscendental;
-        }
-        else
-        {
-            info.functional_group_subgroup_info.IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupUnknown;
+            info.functional_group_subgroup_info.isa_functional_subgroups.push_back(FunctionalSubgroupNameToEnum(subgroup));
         }
     }
 
@@ -881,12 +1613,16 @@ namespace amdisa
                 // Lookup for the target index in PC to Index Map
                 const auto& target_index_iter = std::find(pc_to_index_map.begin(), pc_to_index_map.end(), pc_formatter.str());
                 const auto& target_label_iter = pc_to_label_map.find(pc_formatter.str());
-                const bool  can_access        = (target_index_iter != pc_to_index_map.end()) && (target_label_iter != pc_to_label_map.end());
+                const bool  is_label_found    = (!pc_to_label_map.empty() && target_label_iter != pc_to_label_map.end());
+                const bool  can_access        = ((target_index_iter != pc_to_index_map.end()) && (pc_to_label_map.empty() || is_label_found));
                 if (can_access)
                 {
                     inst_info.instruction_semantic_info.branch_info.branch_target_pc    = pc_formatter.str();
                     inst_info.instruction_semantic_info.branch_info.branch_target_index = uint64_t(target_index_iter - pc_to_index_map.begin());
-                    inst_info.instruction_semantic_info.branch_info.branch_target_label = target_label_iter->second;
+                    if (is_label_found)
+                    {
+                        inst_info.instruction_semantic_info.branch_info.branch_target_label = target_label_iter->second;
+                    }
                 }
                 else
                 {
@@ -934,6 +1670,152 @@ namespace amdisa
         void SetInitialized(bool is_initialized)
         {
             is_initialized_ = is_initialized;
+        }
+
+        bool Initialize(std::string& err_message)
+        {
+            // Check compatibility.
+            const std::string& xml_schema_version = this->GetSpec().info.schema_version;
+            bool               is_compatible      = amdisa::ApiVersion::IsCompatible(xml_schema_version, err_message);
+            bool               is_isa_spec_parsed = true;
+
+            if (is_compatible)
+            {
+                const IsaSpec& spec_data = this->GetSpec();
+
+                // MIMG Address count information initialization.
+                GpuArchitecture current_architecture = GetArchitectureWithId(spec_data.architecture.id);
+                if (current_architecture == GpuArchitecture::kRdna1 || current_architecture == GpuArchitecture::kRdna2
+                    || current_architecture == GpuArchitecture::kCdna1 || current_architecture == GpuArchitecture::kCdna2)
+                {
+                    mimg_acnt_table_.GenerateRdnaCdna1or2Table(current_architecture);
+                }
+                else if (current_architecture == GpuArchitecture::kRdna3 || current_architecture == GpuArchitecture::kRdna3_5)
+                {
+                    mimg_acnt_table_.GenerateRdna3or3p5Table(current_architecture);
+                }
+                else if (GetArchitectureWithId(spec_data.architecture.id) == GpuArchitecture::kRdna4)
+                {
+                    mimg_acnt_table_.GenerateRdna4Table();
+                }
+
+                // Map identifiers to encodings.
+                for (const Encoding& encoding : spec_data.encodings)
+                {
+                    for (uint64_t identifier : encoding.identifiers)
+                    {
+                        // Identifier mask is the mask of the encoding fields and the opcode fields.
+                        // Everything else can be safely masked out for this mapping.
+                        uint64_t identifier_mask = (encoding.mask | encoding.opcode_mask | encoding.seg_mask);
+                        identifier               = identifier & identifier_mask;
+                        this->MapIdentifierToEncoding(identifier, std::make_shared<Encoding>(encoding));
+                    }
+                }
+
+                // Map identifiers to instructions.
+                for (const Instruction& instruction : spec_data.instructions)
+                {
+                    for (uint64_t encoding_itr = 0; (is_isa_spec_parsed && encoding_itr < instruction.encodings.size()); encoding_itr++)
+                    {
+                        const InstructionEncoding& instruction_encoding = instruction.encodings[encoding_itr];
+                        // VOPD handling, determine if x or y layout.
+                        bool is_x_layout = IsOperandPresent(instruction_encoding, "VDSTX");
+                        bool is_y_layout = IsOperandPresent(instruction_encoding, "VDSTY");
+
+                        // Form encoding identifier.
+                        const auto& found_encoding_iterator = std::find_if(spec_data.encodings.begin(), spec_data.encodings.end(), [&](const Encoding& encoding) {
+                            return encoding.name == instruction_encoding.name;
+                        });
+                        assert(found_encoding_iterator != spec_data.encodings.end());
+
+                        const auto& microcode    = found_encoding_iterator->microcode_format;
+                        const auto& op_iter      = GetFieldIterator(microcode, "OP");
+                        const auto& opx_iter     = GetFieldIterator(microcode, "OPX");
+                        const auto& opy_iter     = GetFieldIterator(microcode, "OPY");
+                        const auto& seg_iter     = GetFieldIterator(microcode, "SEG");
+                        bool        is_op_found  = op_iter != microcode.bit_map.end();
+                        bool        is_opx_found = opx_iter != microcode.bit_map.end();
+                        bool        is_opy_found = opy_iter != microcode.bit_map.end();
+                        bool        is_seg_found = seg_iter != microcode.bit_map.end();
+                        uint64_t    identifier   = found_encoding_iterator->bits;
+
+                        Range range;
+                        if (is_op_found)
+                        {
+                            if (!AmdIsaUtility::GetRange(*op_iter, range, 0))
+                            {
+                                is_isa_spec_parsed = false;
+                                err_message        = kStringErrorEmptyRangesInField + op_iter->name;
+                            }
+                            else
+                            {
+                                const uint64_t positioned_op = AmdIsaUtility::PositionValueToField(instruction_encoding.opcode,
+                                    found_encoding_iterator->microcode_format, "OP");
+                                identifier |= positioned_op;
+                                if (is_seg_found)
+                                {
+                                    uint64_t positioned_seg = 0;
+                                    if (kSegBits.find(instruction_encoding.name) != kSegBits.end())
+                                    {
+                                        if (!AmdIsaUtility::GetRange(*seg_iter, range, 0))
+                                        {
+                                            is_isa_spec_parsed = false;
+                                            err_message        = kStringErrorEmptyRangesInField + seg_iter->name;
+                                        }
+                                        else
+                                        {
+                                            positioned_seg = (static_cast<uint64_t>(kSegBits.at(instruction_encoding.name)) << range.bit_offset);
+                                            identifier |= positioned_seg;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        this->GetLog().push_back(kStringWarningSegBits);
+                                    }
+                                }
+                            }
+                        }
+                        else if (is_x_layout)
+                        {
+                            assert(is_opx_found && !is_y_layout);
+                            if (!AmdIsaUtility::GetRange(*opx_iter, range, 0))
+                            {
+                                is_isa_spec_parsed = false;
+                                err_message        = kStringErrorEmptyRangesInField + opx_iter->name;
+                            }
+                            else
+                            {
+                                const uint64_t positioned_opx = static_cast<uint64_t>(instruction_encoding.opcode) << range.bit_offset;
+                                identifier |= positioned_opx;
+                            }
+                        }
+                        else if (is_y_layout)
+                        {
+                            assert(is_opy_found && !is_x_layout);
+                            if (!AmdIsaUtility::GetRange(*opy_iter, range, 0))
+                            {
+                                is_isa_spec_parsed = false;
+                                err_message        = kStringErrorEmptyRangesInField + opy_iter->name;
+                            }
+                            else
+                            {
+                                const uint64_t positioned_opy = static_cast<uint64_t>(instruction_encoding.opcode) << range.bit_offset;
+                                identifier |= positioned_opy;
+                            }
+                        }
+                        else
+                        {
+                            assert(instruction.name.find("EXP") != std::string::npos);
+                        }
+
+                        // Map.
+                        this->MapIdentifierToInstruction(identifier, std::make_shared<Instruction>(instruction));
+                        this->MapIdentifierToInstructionEncoding(identifier, std::make_shared<InstructionEncoding>(instruction_encoding));
+                    }
+                }
+            }
+
+            return is_compatible && is_isa_spec_parsed;
         }
 
         void MapIdentifierToEncoding(uint64_t identifier, std::shared_ptr<Encoding> encoding_ptr)
@@ -1000,6 +1882,11 @@ namespace amdisa
             return log_;
         }
 
+        mimg_workaround::AcntHandler& GetMimgAcntTable()
+        {
+            return mimg_acnt_table_;
+        }
+
     private:
         // Internal representation of the spec.
         IsaSpec spec_data_;
@@ -1022,6 +1909,9 @@ namespace amdisa
 
         // Log messages that should be communicated from API which are not errors.
         std::vector<std::string> log_;
+
+        // MIMG Address Count information.
+        mimg_workaround::AcntHandler mimg_acnt_table_;
     };
 
     bool IsaDecoder::Initialize(const std::string& input_xml_file_path, std::string& err_message)
@@ -1052,137 +1942,40 @@ namespace amdisa
             api_impl_->SetInitialized(is_xml_read_successful);
         }
 
-        // Check compatibility.
-        bool is_compatible = false;
+
+        return is_xml_read_successful && api_impl_->Initialize(err_message) && (api_impl_ != nullptr);
+    }
+
+    bool IsaDecoder::Initialize(const char *input_xml_data, const size_t datalen, std::string& err_message)
+    {
+        bool is_xml_read_successful = true;
+
+        // Allocate implementation.
+        if (api_impl_ == nullptr)
+        {
+            api_impl_ = new IsaDecoderImpl();
+        }
+        else
+        {
+            delete api_impl_;
+            api_impl_ = new IsaDecoderImpl();
+        }
+
+        if (api_impl_ == nullptr)
+        {
+            is_xml_read_successful = false;
+            err_message            = kStringErrorApiImplAllocationFailed;
+        }
+
+        // Read spec.
         if (is_xml_read_successful)
         {
-            const std::string& xml_schema_version = api_impl_->GetSpec().info.schema_version;
-            is_compatible                         = amdisa::ApiVersion::IsCompatible(xml_schema_version, err_message);
+            is_xml_read_successful = IsaXmlReader::ReadSpec(input_xml_data, datalen, api_impl_->GetSpec(), err_message);
+            api_impl_->SetInitialized(is_xml_read_successful);
         }
 
-        if (is_xml_read_successful && is_compatible)
-        {
-            const IsaSpec& spec_data = api_impl_->GetSpec();
 
-            // Map identifiers to encodings.
-            for (const Encoding& encoding : spec_data.encodings)
-            {
-                for (uint64_t identifier : encoding.identifiers)
-                {
-                    // Identifier mask is the mask of the encoding fields and the opcode fields.
-                    // Everything else can be safely masked out for this mapping.
-                    uint64_t identifier_mask = (encoding.mask | encoding.opcode_mask | encoding.seg_mask);
-                    identifier               = identifier & identifier_mask;
-                    api_impl_->MapIdentifierToEncoding(identifier, std::make_shared<Encoding>(encoding));
-                }
-            }
-
-            // Map identifiers to instructions.
-            for (const Instruction& instruction : spec_data.instructions)
-            {
-                for (uint64_t encoding_itr = 0; (is_xml_read_successful && encoding_itr < instruction.encodings.size()); encoding_itr++)
-                {
-                    const InstructionEncoding& instruction_encoding = instruction.encodings[encoding_itr];
-                    // VOPD handling, determine if x or y layout.
-                    bool is_x_layout = IsOperandPresent(instruction_encoding, "VDSTX");
-                    bool is_y_layout = IsOperandPresent(instruction_encoding, "VDSTY");
-
-                    // Form encoding identifier.
-                    const auto& found_encoding_iterator = std::find_if(spec_data.encodings.begin(), spec_data.encodings.end(), [&](const Encoding& encoding) {
-                        return encoding.name == instruction_encoding.name;
-                    });
-                    assert(found_encoding_iterator != spec_data.encodings.end());
-
-                    const auto& microcode    = found_encoding_iterator->microcode_format;
-                    const auto& op_iter      = GetFieldIterator(microcode, "OP");
-                    const auto& opx_iter     = GetFieldIterator(microcode, "OPX");
-                    const auto& opy_iter     = GetFieldIterator(microcode, "OPY");
-                    const auto& seg_iter     = GetFieldIterator(microcode, "SEG");
-                    bool        is_op_found  = op_iter != microcode.bit_map.end();
-                    bool        is_opx_found = opx_iter != microcode.bit_map.end();
-                    bool        is_opy_found = opy_iter != microcode.bit_map.end();
-                    bool        is_seg_found = seg_iter != microcode.bit_map.end();
-                    uint64_t    identifier   = found_encoding_iterator->bits;
-
-                    Range range;
-                    if (is_op_found)
-                    {
-                        if (!AmdIsaUtility::GetRange(*op_iter, range))
-                        {
-                            is_xml_read_successful = false;
-                            err_message            = kStringErrorEmptyRangesInField + op_iter->name;
-                        }
-                        else
-                        {
-                            // Specified opcode value can be larger than allocated bits in the encoding.
-                            // The most significant bits can be masked out.
-                            uint64_t       opcode_mask   = (1ULL << range.bit_count) - 1;
-                            const uint64_t positioned_op = static_cast<uint64_t>(instruction_encoding.opcode & opcode_mask) << range.bit_offset;
-                            identifier |= positioned_op;
-                            if (is_seg_found)
-                            {
-                                uint64_t positioned_seg = 0;
-                                if (kSegBits.find(instruction_encoding.name) != kSegBits.end())
-                                {
-                                    if (!AmdIsaUtility::GetRange(*seg_iter, range))
-                                    {
-                                        is_xml_read_successful = false;
-                                        err_message            = kStringErrorEmptyRangesInField + seg_iter->name;
-                                    }
-                                    else
-                                    {
-                                        positioned_seg = (static_cast<uint64_t>(kSegBits.at(instruction_encoding.name)) << range.bit_offset);
-                                        identifier |= positioned_seg;
-                                    }
-                                }
-                                else
-                                {
-                                    api_impl_->GetLog().push_back(kStringWarningSegBits);
-                                }
-                            }
-                        }
-                    }
-                    else if (is_x_layout)
-                    {
-                        assert(is_opx_found && !is_y_layout);
-                        if (!AmdIsaUtility::GetRange(*opx_iter, range))
-                        {
-                            is_xml_read_successful = false;
-                            err_message            = kStringErrorEmptyRangesInField + opx_iter->name;
-                        }
-                        else
-                        {
-                            const uint64_t positioned_opx = static_cast<uint64_t>(instruction_encoding.opcode) << range.bit_offset;
-                            identifier |= positioned_opx;
-                        }
-                    }
-                    else if (is_y_layout)
-                    {
-                        assert(is_opy_found && !is_x_layout);
-                        if (!AmdIsaUtility::GetRange(*opy_iter, range))
-                        {
-                            is_xml_read_successful = false;
-                            err_message            = kStringErrorEmptyRangesInField + opy_iter->name;
-                        }
-                        else
-                        {
-                            const uint64_t positioned_opy = static_cast<uint64_t>(instruction_encoding.opcode) << range.bit_offset;
-                            identifier |= positioned_opy;
-                        }
-                    }
-                    else
-                    {
-                        assert(instruction.name.find("EXP") != std::string::npos);
-                    }
-
-                    // Map.
-                    api_impl_->MapIdentifierToInstruction(identifier, std::make_shared<Instruction>(instruction));
-                    api_impl_->MapIdentifierToInstructionEncoding(identifier, std::make_shared<InstructionEncoding>(instruction_encoding));
-                }
-            }
-        }
-
-        return is_xml_read_successful && is_compatible && (api_impl_ != nullptr);
+        return is_xml_read_successful && api_impl_->Initialize(err_message) && (api_impl_ != nullptr);
     }
 
     std::string IsaDecoder::GetVersion() const
@@ -1458,7 +2251,7 @@ namespace amdisa
                                         instruction_info.instruction_description                              = inst.description;
 
                                         // Get Functional Group and Subgroup Information
-                                        GetFunctionalGroupSubgroupInfo(instruction_info, inst.functional_group_name, inst.functional_subgroup_name);
+                                        GetFunctionalGroupSubgroupInfo(instruction_info, inst.functional_group_name, inst.functional_subgroups);
 
                                         // Get Functional Group Description
                                         instruction_info.functional_group_subgroup_info.description = "Functional group description not found!";
@@ -1471,6 +2264,18 @@ namespace amdisa
                                                 break;
                                             }
                                         }
+
+                                        // DMASK
+                                        uint64_t dmask_value = 0;
+                                        const auto& dmask_field_iterator =
+                                            GetFieldIterator(working_dwords, "DMASK", encoding_ptr->microcode_format, dmask_value, api_impl_->GetLog());
+                                        bool has_dmask_field = (dmask_field_iterator != encoding_ptr->microcode_format.bit_map.end());
+
+                                        // SADDR
+                                        uint64_t    saddr_value = 0;
+                                        const auto& saddr_field_iterator =
+                                            GetFieldIterator(working_dwords, "SADDR", encoding_ptr->microcode_format, saddr_value, api_impl_->GetLog());
+                                        bool has_operand_saddr = (saddr_field_iterator != encoding_ptr->microcode_format.bit_map.end());
 
                                         // Get the operands.
                                         Encoding encoding = *encoding_ptr;
@@ -1493,7 +2298,6 @@ namespace amdisa
                                                 bool is_implied_literal = false;
                                                 if (encoding.name.find("LITERAL") != std::string::npos && field_name.empty())
                                                 {
-                                                    field_name         = "SIMM32";
                                                     is_implied_literal = true;
                                                 }
 
@@ -1535,10 +2339,12 @@ namespace amdisa
                                                 if (is_operand_retrieval_successful)
                                                 {
                                                     instruction_info.instruction_operands.push_back(InstructionOperand());
-                                                    auto& instruction_operand        = instruction_info.instruction_operands.back();
-                                                    instruction_operand.is_input     = operand.input;
-                                                    instruction_operand.is_output    = operand.output;
-                                                    instruction_operand.operand_size = operand.size;
+                                                    auto& instruction_operand               = instruction_info.instruction_operands.back();
+                                                    instruction_operand.is_input            = operand.input;
+                                                    instruction_operand.is_output           = operand.output;
+                                                    instruction_operand.operand_size        = operand.size;
+                                                    instruction_operand.data_format         = operand.data_format;
+                                                    instruction_operand.encoding_field_name = operand.encoding_field_name;
 
                                                     const auto& predefined_value_iterator = std::find_if(
                                                         operand_type_iterator->predefined_values.begin(),
@@ -1555,7 +2361,7 @@ namespace amdisa
                                                         }
                                                     }
 
-                                                    if (field_name.find("SIMM") == 0 && encoding.name.find("LITERAL") != std::string::npos)
+                                                    if (field_name.find("LITERAL") != std::string::npos && encoding.name.find("LITERAL") != std::string::npos)
                                                     {
                                                         std::stringstream formatter;
                                                         formatter << std::hex << "lit(0x" << field_value << ")";
@@ -1571,13 +2377,54 @@ namespace amdisa
                                                             instruction_operand.operand_name = operand_name;
                                                             if (operand_name.length() > 1)
                                                             {
-                                                                const bool is_size_wave_dependent =
-                                                                    (operand.data_format == kWaveDependentFormat) ||
+                                                                const bool kIsMimgEnc     = (encoding_ptr->name.find("MIMG") != std::string::npos);
+                                                                const bool kIsVimageEnc   = (encoding_ptr->name.find("VIMAGE") != std::string::npos);
+                                                                const bool kIsVsampleEnc  = (encoding_ptr->name.find("VSAMPLE") != std::string::npos);
+                                                                const bool kIsVdataOperand = (operand.encoding_field_name.find("VDATA") != std::string::npos);
+                                                                const bool kIsAddrOperand = (operand.encoding_field_name.find("VADDR") != std::string::npos) ||
+                                                                                            (operand.encoding_field_name.empty() && (kIsVimageEnc || kIsVsampleEnc));
+                                                                const bool kIsNsa         = (encoding_ptr->name.find("NSA") != std::string::npos);
+                                                                const bool kIsListOperand = (kIsNsa || kIsVimageEnc || kIsVsampleEnc) && kIsAddrOperand;
+                                                                const bool kIsWaveDependent = (operand.data_format == kWaveDependentFormat) ||
                                                                     (is_mubuf_encoding && operand.encoding_field_name == "VADDR");
+
                                                                 const bool is_next_digit = std::isdigit(static_cast<uint8_t>(operand_name[1]));
                                                                 const bool is_sgpr       = (operand_name[0] == 's') && (is_next_digit);
                                                                 const bool is_vgpr       = (operand_name[0] == 'v') && (is_next_digit);
-                                                                if (!is_size_wave_dependent && (instruction_operand.operand_size > kDwordSize) &&
+                                                                if (kIsListOperand)
+                                                                {
+                                                                    instruction_operand.operand_name = mimg_workaround::GetNameAsList(working_dwords, encoding.microcode_format,
+                                                                        operand_type_iterator->predefined_values, api_impl_->GetMimgAcntTable(), GetArchitecture(),
+                                                                        api_impl_->GetLog());
+                                                                }
+                                                                else if (kIsAddrOperand && !kIsNsa && kIsMimgEnc)
+                                                                {
+                                                                    int32_t acnt = mimg_workaround::GetAcnt(working_dwords,
+                                                                                                            encoding.microcode_format,
+                                                                                                            api_impl_->GetMimgAcntTable(),
+                                                                                                            api_impl_->GetLog());
+                                                                    if (acnt > 0)
+                                                                    {
+                                                                        instruction_operand.operand_name =
+                                                                            GetNameAsRegisterRange(operand_name, (acnt + 1) * kDwordSize);
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        instruction_operand.operand_name = operand_name;
+                                                                    }
+                                                                }
+                                                                else if (kIsVsampleEnc && kIsVdataOperand && has_dmask_field && is_vgpr)
+                                                                {
+                                                                    uint8_t dmask_bitcount = AmdIsaUtility::BitCount(dmask_value);
+                                                                    instruction_operand.operand_size = dmask_bitcount * kDwordSize;
+                                                                    instruction_operand.operand_name =
+                                                                        GetNameAsRegisterRange(operand_name, instruction_operand.operand_size);
+                                                                }
+                                                                else if (kIsAddrOperand && has_operand_saddr && saddr_value != kSrcNull && is_vgpr)
+                                                                {
+                                                                    instruction_operand.operand_size = kDwordSize;
+                                                                }
+                                                                else if (!kIsWaveDependent && (instruction_operand.operand_size > kDwordSize) &&
                                                                     (is_sgpr || is_vgpr))
                                                                 {
                                                                     instruction_operand.operand_name =
@@ -1614,7 +2461,7 @@ namespace amdisa
                                                     else if (operand_type_iterator->is_partitioned)
                                                     {
                                                         assert(field_value <= UINT32_MAX);
-                                                        instruction_operand.operand_name = GeneratePartitionedOperand(
+                                                        instruction_operand.operand_name = GeneratePartitionedOperand(instruction_info.instruction_name,
                                                             operand_type_iterator->microcode_format, static_cast<uint32_t>(field_value), api_impl_->GetLog());
                                                         if (is_implied_literal)
                                                         {
@@ -1859,13 +2706,7 @@ namespace amdisa
 
     GpuArchitecture IsaDecoder::GetArchitecture() const
     {
-        GpuArchitecture ret            = GpuArchitecture::kUnknown;
-        auto            arch_enum_iter = kArchitectureIdToEnum.find(api_impl_->GetSpec().architecture.id);
-        if (arch_enum_iter != kArchitectureIdToEnum.end())
-        {
-            ret = arch_enum_iter->second;
-        }
-        return ret;
+        return GetArchitectureWithId(api_impl_->GetSpec().architecture.id);
     }
 
     IsaDecoder::~IsaDecoder()

@@ -29,9 +29,10 @@ namespace amdisa
     // Constants.
     static const uint32_t kBranchOffsetOutOfRange = (1 << 16);
     static const uint64_t kInvalidBranchTarget    = UINT64_MAX;
+    static const uint64_t kSrcNull                = 0x7c;
 
     // Instruction's functional group.
-    enum class kFunctionalGroup
+    enum class FunctionalGroups
     {
         kFunctionalGroupUnknown,      // Unknown
         kFunctionalGroupSalu,         // Scalar ALU
@@ -45,7 +46,7 @@ namespace amdisa
         kFunctionalGroupTrap          // Trap
     };
 
-    static constexpr const char* kFunctionalGroupName[] = {
+    constexpr const char* FunctionalGroupNames[] = {
         "Unknown",        // Unknown
         "Scalar ALU",     // Scalar ALU
         "Scalar Memory",  // Scalar Memory
@@ -59,7 +60,7 @@ namespace amdisa
     };
 
     // Instruction's functional group's subgroup.
-    enum class kFunctionalSubgroup
+    enum class FunctionalSubgroups
     {
         kFunctionalSubgroupUnknown,        // Unknown
         kFunctionalSubgroupFloatingPoint,  // Floating Point
@@ -78,7 +79,7 @@ namespace amdisa
         kFunctionalSubgroupTranscendental  // Transcendental
     };
 
-    static constexpr const char* kFunctionalSubgroupName[] = {
+    constexpr const char* FunctionalSubgroupNames[] = {
         "Unknown",         // Unknown
         "Floating Point",  // Floating Point
         "Buffer",          // Buffer
@@ -90,7 +91,7 @@ namespace amdisa
         "Atomic",          // Atomic
         "Flat",            // Flat
         "Data Share",      // Data Share
-        "Static"           // Static
+        "Static",          // Static
         "MFMA",            // MFMA
         "WMMA",            // WMMA
         "Transcendental"   // Transcendental
@@ -129,6 +130,12 @@ namespace amdisa
 
         // Size of the operand.
         uint32_t operand_size = 0;
+
+        // Data Format of the operand.
+        std::string data_format;
+
+        // The name of the encoded field that corresponds to this operand.
+        std::string encoding_field_name;
 
         // True if the operand is an input to an instruction (source).
         bool is_input = false;
@@ -181,11 +188,20 @@ namespace amdisa
         bool is_immediately_executed = false;
     };
 
+    // Describes an instruction's primary functional group and any more specific
+    // subgroups it belongs to within an instruction set architecture.
     struct FunctionalGroupSubgroupInfo
     {
-        std::string         description;
-        kFunctionalGroup    IsaFunctionalGroup    = kFunctionalGroup::kFunctionalGroupUnknown;
-        kFunctionalSubgroup IsaFunctionalSubgroup = kFunctionalSubgroup::kFunctionalSubgroupUnknown;
+        // Functional group description.
+        std::string description;
+
+        // Functional group.
+        FunctionalGroups isa_functional_group = FunctionalGroups::kFunctionalGroupUnknown;
+
+        // The subgroups of this instruction, where each subgroup forms
+        // a pair with the group in the form of { <fg, sub_fg1>,
+        // <fg, sub_fg2>, <fg, sub_fg3>, ... }.
+        std::vector<FunctionalSubgroups> isa_functional_subgroups;
     };
 
     // InstructionInfo is a structure that gets populated as a result of API
@@ -252,6 +268,16 @@ namespace amdisa
         bool Initialize(const std::string& input_xml_file_path, std::string& err_message);
 
         /*
+     * Initialize --
+     *
+     * Reads in XML ISA specification from memory and populates the internal structures.
+     *
+     * Returns true if the spec was successfully read, or false otherwise
+     * with the error message in err_message.
+     */
+        bool Initialize(const char *input_xml_data, const size_t datalen, std::string& err_message);
+
+        /*
      * GetVersion --
      *
      * Return a "<major>.<minor>.<patch>" string that represents the version of this API.
@@ -277,6 +303,9 @@ namespace amdisa
      * instruction) was decoded successfully and populates instruction_info with
      * corresponding information about the decoded instruction.
      * Returns false otherwise with the error string output.
+     *
+     * Note: branch resolution will not be performed when decoding a single instruction.
+     * If branch resolution is required, use DecodeShaderDisassemblyText() or DecodeShaderDisassemblyFile().
      */
         bool DecodeInstruction(uint64_t machine_code, InstructionInfoBundle& instruction_info, std::string& err_message) const;
 
@@ -301,6 +330,9 @@ namespace amdisa
      * successful decode, the function outputs a vector of InstructionInfoGroup.
      * Each of the objects in the vector correspond to a decoded instruction in
      * the input instruction stream.
+     *
+     * Note: branch resolution will not be performed when decoding a single instruction.
+     * If branch resolution is required, use DecodeShaderDisassemblyText() or DecodeShaderDisassemblyFile().
      */
         bool DecodeInstructionStream(const std::vector<uint32_t>&        machine_code_stream,
                                      std::vector<InstructionInfoBundle>& instruction_info_stream,

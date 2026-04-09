@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
  */
 #ifndef AMDISA_XML_ELEMENT_CONSTS_H_
 #define AMDISA_XML_ELEMENT_CONSTS_H_
@@ -12,8 +12,10 @@ namespace amdisa
     static const char* kElementDocument      = "Document";
     static const char* kElementCopyright     = "Copyright";
     static const char* kElementSensitivity   = "Sensitivity";
+    static const char* kElementLicense       = "License";
     static const char* kElementDate          = "ReleaseDate";
     static const char* kElementIsa           = "ISA";
+    static const char* kElementIsaSemantics  = "ISASemantics";
     static const char* kElementSchemaVersion = "SchemaVersion";
 
     // Architecture specific elements.

@@ -24,7 +24,9 @@ namespace amdisa
         static std::string ToLower(const std::string& str);
         static std::string Strip(const std::string& str);
         static uint64_t    StringToUnsignedInt(const std::string& str_num);
-        static bool        GetRange(const Field& field, Range& range);
+        static bool        GetRange(const Field& field, Range& range, uint32_t range_order);
+        static uint64_t    PositionValueToField(uint64_t value, const MicrocodeFormat& microcode_format, const std::string& field_name);
+        static uint8_t     BitCount(uint64_t value);
     };
 }  // namespace amdisa
 #endif  // AMDISA_UTILITY_H_

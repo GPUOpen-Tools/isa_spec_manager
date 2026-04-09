@@ -41,9 +41,9 @@ namespace amdisa
     static const char* kStringErrorXmlReadErrorTypeTreeParseIssue =
         "Error: Failed to read expression tree. Failed to parse one of the "
         "elements of the type tree.";
-    static const char* kStringErrorXmlEmptyFunctionalGroups = 
+    static const char* kStringErrorXmlEmptyFunctionalGroups =
         "Error : Failed to read XML file. Functional groups information is missing.";
-    static const char* kStringErrorXmlEmptyFunctionalSubgroups = 
+    static const char* kStringErrorXmlEmptyFunctionalSubgroups =
         "Error : Failed to read XML file. Functional subgroups information is missing.";
 
     // Type defintions.
@@ -245,11 +245,17 @@ namespace amdisa
 
         if (field_iterator != microcode_format.bit_map.end())
         {
-            // Construct the mask of right size.
-            mask = (1 << field_iterator->ranges[0].bit_count) - 1;
+            for (const auto& range : field_iterator->ranges)
+            {
+                // Construct the mask of right size.
+                uint64_t partial_mask = (1ULL << range.bit_count) - 1;
 
-            // Shift the mask to the corresponding field location.
-            mask <<= field_iterator->ranges[0].bit_offset;
+                // Shift the mask to the corresponding field location.
+                partial_mask <<= range.bit_offset;
+
+                // Add to the final mask.
+                mask |= partial_mask;
+            }
         }
 
         return mask;
@@ -681,6 +687,7 @@ namespace amdisa
                             auto& range = field.ranges.back();
 
                             // Populate range information.
+                            range.order      = std::stoi((*ranges_xml_iterator)->Attribute(kAttributeOrder));
                             range.bit_count  = std::stoi(ExtractText(range_bit_count_element));
                             range.bit_offset = std::stoi(ExtractText(range_bit_offset_element));
 
@@ -817,13 +824,7 @@ namespace amdisa
                         auto& condition = single_encoding.conditions.back();
 
                         // Populate condition information.
-                        condition.name      = ExtractText(condition_name_element);
-                        auto expression_ptr = std::make_shared<GenericExpressionNode>();
-                        bool is_read        = ReadExpressionTree(condition_expression_element, expression_ptr, err_message);
-                        if (is_read)
-                        {
-                            condition.expression = *expression_ptr;
-                        }
+                        condition.name = ExtractText(condition_name_element);
                     }
                     else
                     {
@@ -955,10 +956,15 @@ namespace amdisa
                     {
                         single_instruction.functional_group_name = ExtractText(functional_group_name_element);
                     }
-                    XmlElement* functional_subgroup_name_element = GetElementByName(kElementSubgroup, functional_group_element);
-                    if (functional_subgroup_name_element != nullptr)
+                    XmlElement* functional_subgroups_element = GetElementByName(kElementFunctionalSubgroups, functional_group_element);
+                    if (functional_subgroups_element != nullptr)
                     {
-                        single_instruction.functional_subgroup_name = ExtractText(functional_subgroup_name_element);
+                        XmlIterator functional_subgroups_xml_iterator = XmlIterator(functional_subgroups_element->FirstChildElement());
+                        while (functional_subgroups_xml_iterator.IsValid())
+                        {
+                            single_instruction.functional_subgroups.push_back(ExtractText(*functional_subgroups_xml_iterator));
+                            ++functional_subgroups_xml_iterator;
+                        }
                     }
                 }
 
@@ -1315,7 +1321,7 @@ namespace amdisa
     }
 
     // Reads the functional group and subgroup information from the XML's <FunctionalGroups> and populates spec_data's functional_group_info
-    static bool ReadFunctionalGroupInfo(const XmlElement* isa_element, IsaSpec& spec_data, std::string& err_message)
+    bool ReadFunctionalGroupInfo(const XmlElement* isa_element, IsaSpec& spec_data, std::string& err_message)
     {
         bool should_abort = false;
 
@@ -1377,49 +1383,30 @@ namespace amdisa
         return !should_abort;
     }
 
-    // *** INTERNALLY-LINKED AUXILIARY FUNCTIONS - END ***
-
-    bool IsaXmlReader::ReadSpec(const std::string& path_to_input_xml, IsaSpec& spec_data, std::string& err_message)
+    static bool ParseSpecFromXML(XmlDocument& xml_document, IsaSpec& spec_data, std::string& err_message)
     {
-        bool is_read_successful = false;
+        // Get non-ISA related information.
+        XmlElement* document_element       = GetElementByName(kElementDocument, xml_document.FirstChildElement());
+        XmlElement* copyright_element      = GetElementByName(kElementCopyright, document_element);
+        XmlElement* sensitivity_element    = GetElementByName(kElementSensitivity, document_element);
+        XmlElement* date_element           = GetElementByName(kElementDate, document_element);
+        XmlElement* schema_version_element = GetElementByName(kElementSchemaVersion, document_element);
 
-        // Load the XML.
-        XmlDocument    xml_document;
-        const XmlError err = xml_document.LoadFile(path_to_input_xml.c_str());
-        if (err == tinyxml2::XML_SUCCESS)
+        bool is_retrieve_successful = document_element != nullptr && copyright_element != nullptr && sensitivity_element != nullptr &&
+                                      date_element != nullptr && schema_version_element != nullptr;
+
+        bool is_read_successful = true;
+        if (is_retrieve_successful)
         {
-            is_read_successful = true;
+            spec_data.info.copyright      = ExtractText(copyright_element);
+            spec_data.info.sensitivity    = ExtractText(sensitivity_element);
+            spec_data.info.date           = ExtractText(date_element);
+            spec_data.info.schema_version = ExtractText(schema_version_element);
         }
         else
         {
             is_read_successful = false;
             err_message        = kStringErrorXmlReadError;
-        }
-
-        // Get non-ISA related information.
-        if (is_read_successful)
-        {
-            XmlElement* document_element       = GetElementByName(kElementDocument, xml_document.FirstChildElement());
-            XmlElement* copyright_element      = GetElementByName(kElementCopyright, document_element);
-            XmlElement* sensitivity_element    = GetElementByName(kElementSensitivity, document_element);
-            XmlElement* date_element           = GetElementByName(kElementDate, document_element);
-            XmlElement* schema_version_element = GetElementByName(kElementSchemaVersion, document_element);
-
-            bool is_retrieve_successful = document_element != nullptr && copyright_element != nullptr && sensitivity_element != nullptr &&
-                                          date_element != nullptr && schema_version_element != nullptr;
-
-            if (is_retrieve_successful)
-            {
-                spec_data.info.copyright      = ExtractText(copyright_element);
-                spec_data.info.sensitivity    = ExtractText(sensitivity_element);
-                spec_data.info.date           = ExtractText(date_element);
-                spec_data.info.schema_version = ExtractText(schema_version_element);
-            }
-            else
-            {
-                is_read_successful = false;
-                err_message        = kStringErrorXmlReadError;
-            }
         }
 
         // Get ISA element.
@@ -1486,5 +1473,36 @@ namespace amdisa
         }
 
         return is_read_successful;
+
+    }
+
+    // *** INTERNALLY-LINKED AUXILIARY FUNCTIONS - END ***
+
+    bool IsaXmlReader::ReadSpec(const std::string& path_to_input_xml, IsaSpec& spec_data, std::string& err_message)
+    {
+        bool is_read_successful = true;
+        // Load the XML.
+        XmlDocument    xml_document;
+        const XmlError err = xml_document.LoadFile(path_to_input_xml.c_str());
+        if (err != tinyxml2::XML_SUCCESS)
+        {
+            err_message = kStringErrorXmlReadError;
+            is_read_successful = false;
+        }
+
+        return is_read_successful && ParseSpecFromXML(xml_document, spec_data, err_message);
+    }
+
+    bool IsaXmlReader::ReadSpec(const char *input_xml_data, const size_t datalen, IsaSpec& spec_data, std::string& err_message)
+    {
+      XmlDocument    xml_document;
+      const XmlError err = xml_document.Parse(input_xml_data, datalen);
+      if (err != tinyxml2::XML_SUCCESS)
+      {
+          err_message = kStringErrorXmlReadError;
+          return false;
+      }
+
+      return ParseSpecFromXML(xml_document, spec_data, err_message);
     }
 }  // namespace amdisa

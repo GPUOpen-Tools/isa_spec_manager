@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
  */
 #ifndef AMDISA_EXPRESSION_TREE_CONSTS_H_
 #define AMDISA_EXPRESSION_TREE_CONSTS_H_
@@ -28,6 +28,7 @@ namespace amdisa
         kBaseType,
         kArrayType,
         kLambdaType,
+        kRecordType,
         kUndefined
     };
 
@@ -68,20 +69,24 @@ namespace amdisa
     static const char* kJsonBaseTypeName   = "!base";
     static const char* kJsonArrayTypeName  = "!array";
     static const char* kJsonLambdaTypeName = "!lambda";
+    static const char* kJsonRecordTypeName = "!record";
 
     // XML type names.
     static const char* kXmlBaseTypeName   = "Base";
     static const char* kXmlArrayTypeName  = "Array";
     static const char* kXmlLambdaTypeName = "Lambda";
+    static const char* kXmlRecordTypeName = "Record";
 
     // Map from JSON type tree string names to enum.
     static const std::map<std::string, TypeTreeNodes> kMapJsonTypeTreeNodeNamesToEnum = {{kJsonBaseTypeName, TypeTreeNodes::kBaseType},
                                                                                          {kJsonArrayTypeName, TypeTreeNodes::kArrayType},
-                                                                                         {kJsonLambdaTypeName, TypeTreeNodes::kLambdaType}};
+                                                                                         {kJsonLambdaTypeName, TypeTreeNodes::kLambdaType},
+                                                                                         {kJsonRecordTypeName, TypeTreeNodes::kRecordType}};
 
     // Map from XML type tree string names to enum.
     static const std::map<std::string, TypeTreeNodes> kMapXmlTypeTreeNodeNamesToEnum = {{kXmlBaseTypeName, TypeTreeNodes::kBaseType},
                                                                                         {kXmlArrayTypeName, TypeTreeNodes::kArrayType},
-                                                                                        {kXmlLambdaTypeName, TypeTreeNodes::kLambdaType}};
+                                                                                        {kXmlLambdaTypeName, TypeTreeNodes::kLambdaType},
+                                                                                        {kXmlRecordTypeName, TypeTreeNodes::kRecordType}};
 }  // namespace amdisa
 #endif  // AMDISA_EXPRESSION_TREE_CONSTANTS_H_

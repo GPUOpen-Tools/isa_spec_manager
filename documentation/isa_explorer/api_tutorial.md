@@ -62,10 +62,6 @@ std::advance(it, dist(gen));
 print_instruction(it->second);
 ```
 
-- **Random Device and Generator:** Creates a random number generator seeded with a hardware-based random device.
-- **Uniform Distribution:** Ensures the random number falls within the valid range of instruction indices.
-- **Iterator Advancement:** Randomly selects an instruction by advancing the iterator to the generated index.
-
 The selected instruction is printed using the `print_instruction` function.
 
 As an exmple, you can use the following print function:

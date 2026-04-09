@@ -27,11 +27,9 @@ namespace amdisa
     public:
         CliCommandDecodeShaderFile(const std::string& shader_file_path,
                                    const std::string& output_xml_path,
-                                   const std::string& info_format,
                                    const IsaDecoder&  spec_api,
                                    bool               is_branch_target_info_set)
-            : info_format_(info_format)
-            , shader_file_path_(shader_file_path)
+            : shader_file_path_(shader_file_path)
             , output_xml_path_(output_xml_path)
             , spec_api_(spec_api)
             , is_branch_target_info_set_(is_branch_target_info_set){};
@@ -40,7 +38,6 @@ namespace amdisa
         bool Execute(std::string& err_message) override;
 
     private:
-        const std::string info_format_;
         const std::string shader_file_path_;
         const std::string output_xml_path_;
         const IsaDecoder& spec_api_;

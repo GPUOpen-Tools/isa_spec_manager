@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
         // Get paths from CLI arguments.
         std::cout << kStrInfoInitializingManager << std::endl;
         std::vector<std::string> xml_spec_paths;
-        for (uint32_t i = 1; i < argc; i++)
+        for (uint32_t i = 1; i < static_cast<unsigned int>(argc); i++)
         {
             xml_spec_paths.push_back(argv[i]);
             std::cout << " - " << argv[i] << std::endl;
@@ -114,10 +114,14 @@ int main(int argc, char* argv[])
                 std::cout << "Instruction Description: " << inst.instruction_description << std::endl;
                 std::cout << "Encoding Name: " << inst.encoding_name << std::endl;
                 std::cout << "Encoding Description: " << inst.encoding_description << std::endl;
-                std::cout << "Functional Group: " << amdisa::kFunctionalGroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalGroup)]
+                std::cout << "Functional Group: " << amdisa::FunctionalGroupNames[static_cast<int>(inst.functional_group_subgroup_info.isa_functional_group)]
                           << std::endl;
-                std::cout << "Functional Subgroup: "
-                          << amdisa::kFunctionalSubgroupName[static_cast<int>(inst.functional_group_subgroup_info.IsaFunctionalSubgroup)] << std::endl;
+                std::cout << "Functional Subgroup: ";
+                for (const auto& subgroup : inst.functional_group_subgroup_info.isa_functional_subgroups)
+                {
+                    std::cout << amdisa::FunctionalSubgroupNames[static_cast<int>(subgroup)] << "; ";
+                }
+                std::cout << std::endl;
                 std::cout << "Functional Group Description: " << inst.functional_group_subgroup_info.description << std::endl;
                 // Similarly, the following information about the instruction can be
                 // fetched:

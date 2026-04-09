@@ -1,19 +1,11 @@
-// Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All rights reserved.
 // This code is auto-generated. Do not edit directly. Report any issues.
-// This code was generated on: 2024-09-18
+// This code was generated on: 2025-09-11
 #ifndef ENCODING_CONDITION_HANDLER_HPP_
 #include <functional>
 #include <map>
 namespace amdisa
 {
-    static bool IsArch5Vop2VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch5Vop2VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
-    }
-
     static bool IsArch5Vop2Default(uint64_t dword) {
         return (((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
@@ -24,6 +16,14 @@ namespace amdisa
 
     static bool IsArch5Vop2InstLiteralDefault(uint64_t dword) {
         return (((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch5Vop2VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch5Vop2VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch5Vop3Default(uint64_t dword) {
@@ -122,16 +122,16 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch5VopcVopSdwaSdstEncDefault(uint64_t dword) {
-        return ((dword & 0x1ff)) == 249;
-    }
-
     static bool IsArch5VopcDefault(uint64_t dword) {
         return (((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
     static bool IsArch5VopcInstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch5VopcVopSdwaSdstEncHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
     }
 
     static bool IsArch5MimgDefault(uint64_t dword) {
@@ -194,27 +194,27 @@ namespace amdisa
         return (((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
-    static bool IsArch5Vop1VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch5Vop1VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
-    }
-
-    static bool IsArch5Vop1VopSdwaDefault(uint64_t dword) {
-        return ((dword & 0x1ff)) == 249;
-    }
-
     static bool IsArch5Vop1InstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch5Vop2VopSdwaDefault(uint64_t dword) {
+    static bool IsArch5Vop1VopSdwaHasSdwa(uint64_t dword) {
         return ((dword & 0x1ff)) == 249;
     }
 
-    static bool IsArch5Vop2VopSdwaSdstEncDefault(uint64_t dword) {
+    static bool IsArch5Vop1VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch5Vop1VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch5Vop2VopSdwaHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch5Vop2VopSdwaSdstEncHasSdwa(uint64_t dword) {
         return ((dword & 0x1ff)) == 249;
     }
 
@@ -282,16 +282,16 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch6VopcVopSdwaSdstEncDefault(uint64_t dword) {
-        return ((dword & 0x1ff)) == 249;
-    }
-
     static bool IsArch6VopcDefault(uint64_t dword) {
         return (((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
     static bool IsArch6VopcInstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch6VopcVopSdwaSdstEncHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
     }
 
     static bool IsArch6MimgDefault(uint64_t dword) {
@@ -354,32 +354,20 @@ namespace amdisa
         return (((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
-    static bool IsArch6Vop1VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch6Vop1VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
-    }
-
-    static bool IsArch6Vop1VopSdwaDefault(uint64_t dword) {
-        return ((dword & 0x1ff)) == 249;
-    }
-
     static bool IsArch6Vop1InstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch6Vop2VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
+    static bool IsArch6Vop1VopSdwaHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
     }
 
-    static bool IsArch6Vop2VopDpp8Default(uint64_t dword) {
+    static bool IsArch6Vop1VopDpp8HasDpp8(uint64_t dword) {
         return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
     }
 
-    static bool IsArch6Vop2VopSdwaDefault(uint64_t dword) {
-        return ((dword & 0x1ff)) == 249;
+    static bool IsArch6Vop1VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch6Vop2Default(uint64_t dword) {
@@ -394,7 +382,19 @@ namespace amdisa
         return (((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
-    static bool IsArch6Vop2VopSdwaSdstEncDefault(uint64_t dword) {
+    static bool IsArch6Vop2VopSdwaHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch6Vop2VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch6Vop2VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch6Vop2VopSdwaSdstEncHasSdwa(uint64_t dword) {
         return ((dword & 0x1ff)) == 249;
     }
 
@@ -462,12 +462,12 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch8Vop3VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch8Vop3VopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch8Vop3VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
+    static bool IsArch8Vop3VopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
     static bool IsArch8Vop3pDefault(uint64_t dword) {
@@ -502,20 +502,12 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch8Vop3pVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch8Vop3pVopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch8Vop3pVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
-    }
-
-    static bool IsArch8VopcVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch8VopcVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    static bool IsArch8Vop3pVopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
     static bool IsArch8VopcDefault(uint64_t dword) {
@@ -526,6 +518,38 @@ namespace amdisa
         return ((dword & 0x1ff)) == 255;
     }
 
+    static bool IsArch8VopcVopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch8VopcVopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch8VopdxVopdxyDefault(uint64_t dword) {
+        return ((dword & 0x1ff)) != 255;
+    }
+
+    static bool IsArch8VopdxVopdxyInstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch8VopdxVopdxyInstLiteralDefault(uint64_t dword) {
+        return ((dword & 0x1ff)) != 255;
+    }
+
+    static bool IsArch8VopdyVopdxyDefault(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) != 255;
+    }
+
+    static bool IsArch8VopdyVopdxyInstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) == 255;
+    }
+
+    static bool IsArch8VopdyVopdxyInstLiteralDefault(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) != 255;
+    }
+
     static bool IsArch8MimgDefault(uint64_t dword) {
         return ((dword & 0x1)) != 1;
     }
@@ -534,7 +558,7 @@ namespace amdisa
         return ((dword & 0x1)) == 1;
     }
 
-    static bool IsArch8Sop1Default(uint64_t dword) {
+    static bool IsArch8Sop1NothasLit0NothasLit1(uint64_t dword) {
         return ((dword & 0xff)) != 255;
     }
 
@@ -578,24 +602,16 @@ namespace amdisa
         return ((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255);
     }
 
-    static bool IsArch8Vop1VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch8Vop1VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
-    }
-
     static bool IsArch8Vop1InstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch8Vop2VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
+    static bool IsArch8Vop1VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
     }
 
-    static bool IsArch8Vop2VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    static bool IsArch8Vop1VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch8Vop2Default(uint64_t dword) {
@@ -608,6 +624,14 @@ namespace amdisa
 
     static bool IsArch8Vop2InstLiteralDefault(uint64_t dword) {
         return ((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255);
+    }
+
+    static bool IsArch8Vop2VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch8Vop2VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch8Vop3SdstEncDefault(uint64_t dword) {
@@ -642,12 +666,12 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch8Vop3SdstEncVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch8Vop3SdstEncVopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch8Vop3SdstEncVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
+    static bool IsArch8Vop3SdstEncVopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
     static bool IsArch9Vop3Default(uint64_t dword) {
@@ -682,12 +706,12 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch9Vop3VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch9Vop3VopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch9Vop3VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
+    static bool IsArch9Vop3VopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
     static bool IsArch9Vop3pDefault(uint64_t dword) {
@@ -722,20 +746,12 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch9Vop3pVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch9Vop3pVopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch9Vop3pVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
-    }
-
-    static bool IsArch9VopcVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch9VopcVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    static bool IsArch9Vop3pVopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
     static bool IsArch9VopcDefault(uint64_t dword) {
@@ -746,6 +762,38 @@ namespace amdisa
         return ((dword & 0x1ff)) == 255;
     }
 
+    static bool IsArch9VopcVopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch9VopcVopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch9VopdxVopdxyDefault(uint64_t dword) {
+        return ((dword & 0x1ff)) != 255;
+    }
+
+    static bool IsArch9VopdxVopdxyInstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch9VopdxVopdxyInstLiteralDefault(uint64_t dword) {
+        return ((dword & 0x1ff)) != 255;
+    }
+
+    static bool IsArch9VopdyVopdxyDefault(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) != 255;
+    }
+
+    static bool IsArch9VopdyVopdxyInstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) == 255;
+    }
+
+    static bool IsArch9VopdyVopdxyInstLiteralDefault(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) != 255;
+    }
+
     static bool IsArch9MimgDefault(uint64_t dword) {
         return ((dword & 0x1)) != 1;
     }
@@ -754,7 +802,7 @@ namespace amdisa
         return ((dword & 0x1)) == 1;
     }
 
-    static bool IsArch9Sop1Default(uint64_t dword) {
+    static bool IsArch9Sop1NothasLit0NothasLit1(uint64_t dword) {
         return ((dword & 0xff)) != 255;
     }
 
@@ -802,24 +850,16 @@ namespace amdisa
         return ((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255);
     }
 
-    static bool IsArch9Vop1VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch9Vop1VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
-    }
-
     static bool IsArch9Vop1InstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch9Vop2VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
+    static bool IsArch9Vop1VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
     }
 
-    static bool IsArch9Vop2VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    static bool IsArch9Vop1VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch9Vop2Default(uint64_t dword) {
@@ -832,6 +872,14 @@ namespace amdisa
 
     static bool IsArch9Vop2InstLiteralDefault(uint64_t dword) {
         return ((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255);
+    }
+
+    static bool IsArch9Vop2VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch9Vop2VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch9Vop3SdstEncDefault(uint64_t dword) {
@@ -866,12 +914,12 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch9Vop3SdstEncVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch9Vop3SdstEncVopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch9Vop3SdstEncVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
+    static bool IsArch9Vop3SdstEncVopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
     static bool IsArch10Vop3Default(uint64_t dword) {
@@ -906,12 +954,20 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch10Vop3VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch10Vop3VopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch10Vop3VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
+    static bool IsArch10Vop3VopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
+    }
+
+    static bool IsArch10Sop1NothasLit0NothasLit1(uint64_t dword) {
+        return ((dword & 0xff)) != 255;
+    }
+
+    static bool IsArch10Sop1InstLiteralHasLit0(uint64_t dword) {
+        return ((dword & 0xff)) == 255;
     }
 
     static bool IsArch10Vop3pDefault(uint64_t dword) {
@@ -946,28 +1002,12 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch10Sop1Default(uint64_t dword) {
-        return ((dword & 0xff)) != 255;
+    static bool IsArch10Vop3pVopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch10Sop1InstLiteralHasLit0(uint64_t dword) {
-        return ((dword & 0xff)) == 255;
-    }
-
-    static bool IsArch10Vop3pVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
-    }
-
-    static bool IsArch10Vop3pVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
-    }
-
-    static bool IsArch10VopcVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch10VopcVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    static bool IsArch10Vop3pVopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
     static bool IsArch10VopcDefault(uint64_t dword) {
@@ -976,6 +1016,14 @@ namespace amdisa
 
     static bool IsArch10VopcInstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch10VopcVopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch10VopcVopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch10Sop2Default(uint64_t dword) {
@@ -998,16 +1046,28 @@ namespace amdisa
         return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) != 255);
     }
 
-    static bool IsArch10VopdxyDefault(uint64_t dword) {
+    static bool IsArch10VopdxVopdxyDefault(uint64_t dword) {
         return ((dword & 0x1ff)) != 255;
     }
 
-    static bool IsArch10VopdxyInstLiteralHasLit(uint64_t dword) {
+    static bool IsArch10VopdxVopdxyInstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch10VopdxyInstLiteralDefault(uint64_t dword) {
+    static bool IsArch10VopdxVopdxyInstLiteralDefault(uint64_t dword) {
         return ((dword & 0x1ff)) != 255;
+    }
+
+    static bool IsArch10VopdyVopdxyDefault(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) != 255;
+    }
+
+    static bool IsArch10VopdyVopdxyInstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) == 255;
+    }
+
+    static bool IsArch10VopdyVopdxyInstLiteralDefault(uint64_t dword) {
+        return ((dword & 0x1ff00000000) >> 32) != 255;
     }
 
     static bool IsArch10SopcDefault(uint64_t dword) {
@@ -1030,24 +1090,16 @@ namespace amdisa
         return ((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255);
     }
 
-    static bool IsArch10Vop1VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
-    }
-
-    static bool IsArch10Vop1VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
-    }
-
     static bool IsArch10Vop1InstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch10Vop2VopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff)) == 250;
+    static bool IsArch10Vop1VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
     }
 
-    static bool IsArch10Vop2VopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    static bool IsArch10Vop1VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch10Vop2Default(uint64_t dword) {
@@ -1060,6 +1112,14 @@ namespace amdisa
 
     static bool IsArch10Vop2InstLiteralDefault(uint64_t dword) {
         return ((((dword & 0x1ff)) != 250) && ((((dword & 0x1ff)) != 233) && (((dword & 0x1ff)) != 234))) && (((dword & 0x1ff)) != 255);
+    }
+
+    static bool IsArch10Vop2VopDpp8HasDpp8(uint64_t dword) {
+        return (((dword & 0x1ff)) == 233) || (((dword & 0x1ff)) == 234);
+    }
+
+    static bool IsArch10Vop2VopDpp16HasDpp16(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
     }
 
     static bool IsArch10Vop3SdstEncDefault(uint64_t dword) {
@@ -1094,103 +1154,103 @@ namespace amdisa
         return ((((dword & 0x1ff00000000) >> 32) == 255) && (((dword & 0x3fe0000000000) >> 41) == 255)) && (((dword & 0x7fc000000000000) >> 50) == 255);
     }
 
-    static bool IsArch10Vop3SdstEncVopDpp16Default(uint64_t dword) {
-        return ((dword & 0x1ff00000000) >> 32) == 250;
+    static bool IsArch10Vop3SdstEncVopDpp8HasDpp8(uint64_t dword) {
+        return (((((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234)) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch10Vop3SdstEncVopDpp8Default(uint64_t dword) {
-        return (((dword & 0x1ff00000000) >> 32) == 233) || (((dword & 0x1ff00000000) >> 32) == 234);
+    static bool IsArch10Vop3SdstEncVopDpp16HasDpp16(uint64_t dword) {
+        return ((((dword & 0x1ff00000000) >> 32) == 250) && (((dword & 0x3fe0000000000) >> 41) != 255)) && (((dword & 0x7fc000000000000) >> 50) != 255);
     }
 
-    static bool IsArch0VopcDefault(uint64_t dword) {
+    static bool IsArch12VopcDefault(uint64_t dword) {
         return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
-    static bool IsArch0VopcInstLiteralHasLit(uint64_t dword) {
+    static bool IsArch12VopcInstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch0VopcVopSdwaSdstEncHasSdwa(uint64_t dword) {
+    static bool IsArch12VopcVopSdwaSdstEncHasSdwa(uint64_t dword) {
         return ((dword & 0x1ff)) == 249;
     }
 
-    static bool IsArch0Sop1Default(uint64_t dword) {
+    static bool IsArch12Sop1Default(uint64_t dword) {
         return ((dword & 0xff)) != 255;
     }
 
-    static bool IsArch0Sop1InstLiteralHasLit0(uint64_t dword) {
+    static bool IsArch12Sop1InstLiteralHasLit0(uint64_t dword) {
         return ((dword & 0xff)) == 255;
     }
 
-    static bool IsArch0Sop2Default(uint64_t dword) {
+    static bool IsArch12Sop2Default(uint64_t dword) {
         return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) != 255);
     }
 
-    static bool IsArch0Sop2InstLiteralHasLit0(uint64_t dword) {
+    static bool IsArch12Sop2InstLiteralHasLit0(uint64_t dword) {
         return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) != 255);
     }
 
-    static bool IsArch0Sop2InstLiteralHasLit1(uint64_t dword) {
+    static bool IsArch12Sop2InstLiteralHasLit1(uint64_t dword) {
         return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) == 255);
     }
 
-    static bool IsArch0Sop2InstLiteralHasLit0HasLit1(uint64_t dword) {
+    static bool IsArch12Sop2InstLiteralHasLit0HasLit1(uint64_t dword) {
         return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) == 255);
     }
 
-    static bool IsArch0SopcDefault(uint64_t dword) {
+    static bool IsArch12SopcDefault(uint64_t dword) {
         return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) != 255);
     }
 
-    static bool IsArch0SopcInstLiteralHasLit0(uint64_t dword) {
+    static bool IsArch12SopcInstLiteralHasLit0(uint64_t dword) {
         return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) != 255);
     }
 
-    static bool IsArch0SopcInstLiteralHasLit1(uint64_t dword) {
+    static bool IsArch12SopcInstLiteralHasLit1(uint64_t dword) {
         return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) == 255);
     }
 
-    static bool IsArch0SopcInstLiteralHasLit0HasLit1(uint64_t dword) {
+    static bool IsArch12SopcInstLiteralHasLit0HasLit1(uint64_t dword) {
         return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) == 255);
     }
 
-    static bool IsArch0Vop1Default(uint64_t dword) {
+    static bool IsArch12Vop1Default(uint64_t dword) {
         return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
-    static bool IsArch0Vop1InstLiteralHasLit(uint64_t dword) {
+    static bool IsArch12Vop1InstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch0Vop1VopDppHasDpp(uint64_t dword) {
+    static bool IsArch12Vop1VopDppHasDpp(uint64_t dword) {
         return ((dword & 0x1ff)) == 250;
     }
 
-    static bool IsArch0Vop1VopSdwaHasSdwa(uint64_t dword) {
+    static bool IsArch12Vop1VopSdwaHasSdwa(uint64_t dword) {
         return ((dword & 0x1ff)) == 249;
     }
 
-    static bool IsArch0Vop2Default(uint64_t dword) {
+    static bool IsArch12Vop2Default(uint64_t dword) {
         return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
-    static bool IsArch0Vop2InstLiteralHasLit(uint64_t dword) {
+    static bool IsArch12Vop2InstLiteralHasLit(uint64_t dword) {
         return ((dword & 0x1ff)) == 255;
     }
 
-    static bool IsArch0Vop2InstLiteralDefault(uint64_t dword) {
+    static bool IsArch12Vop2InstLiteralDefault(uint64_t dword) {
         return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
     }
 
-    static bool IsArch0Vop2VopDppHasDpp(uint64_t dword) {
+    static bool IsArch12Vop2VopDppHasDpp(uint64_t dword) {
         return ((dword & 0x1ff)) == 250;
     }
 
-    static bool IsArch0Vop2VopSdwaHasSdwa(uint64_t dword) {
+    static bool IsArch12Vop2VopSdwaHasSdwa(uint64_t dword) {
         return ((dword & 0x1ff)) == 249;
     }
 
-    static bool IsArch0Vop2VopSdwaSdstEncHasSdwa(uint64_t dword) {
+    static bool IsArch12Vop2VopSdwaSdstEncHasSdwa(uint64_t dword) {
         return ((dword & 0x1ff)) == 249;
     }
 
@@ -1470,15 +1530,107 @@ namespace amdisa
         return ((dword & 0x1ff)) == 249;
     }
 
+    static bool IsArch0VopcDefault(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch0VopcInstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch0VopcVopSdwaSdstEncHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch0Sop1Default(uint64_t dword) {
+        return ((dword & 0xff)) != 255;
+    }
+
+    static bool IsArch0Sop1InstLiteralHasLit0(uint64_t dword) {
+        return ((dword & 0xff)) == 255;
+    }
+
+    static bool IsArch0Sop2Default(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch0Sop2InstLiteralHasLit0(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch0Sop2InstLiteralHasLit1(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch0Sop2InstLiteralHasLit0HasLit1(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch0SopcDefault(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch0SopcInstLiteralHasLit0(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) != 255);
+    }
+
+    static bool IsArch0SopcInstLiteralHasLit1(uint64_t dword) {
+        return (((dword & 0xff)) != 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch0SopcInstLiteralHasLit0HasLit1(uint64_t dword) {
+        return (((dword & 0xff)) == 255) && (((dword & 0xff00) >> 8) == 255);
+    }
+
+    static bool IsArch0Vop1Default(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch0Vop1InstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch0Vop1VopDppHasDpp(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch0Vop1VopSdwaHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch0Vop2Default(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch0Vop2InstLiteralHasLit(uint64_t dword) {
+        return ((dword & 0x1ff)) == 255;
+    }
+
+    static bool IsArch0Vop2InstLiteralDefault(uint64_t dword) {
+        return ((((dword & 0x1ff)) != 250) && (((dword & 0x1ff)) != 255)) && (((dword & 0x1ff)) != 249);
+    }
+
+    static bool IsArch0Vop2VopDppHasDpp(uint64_t dword) {
+        return ((dword & 0x1ff)) == 250;
+    }
+
+    static bool IsArch0Vop2VopSdwaHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
+    static bool IsArch0Vop2VopSdwaSdstEncHasSdwa(uint64_t dword) {
+        return ((dword & 0x1ff)) == 249;
+    }
+
     struct EncodingConditionHandler
     {
         EncodingConditionHandler()
         {
-            arch_conditions_[5]["VOP2_VOP_DPP16_default"] = IsArch5Vop2VopDpp16Default;
-            arch_conditions_[5]["VOP2_VOP_DPP8_default"] = IsArch5Vop2VopDpp8Default;
             arch_conditions_[5]["VOP2_default"] = IsArch5Vop2Default;
             arch_conditions_[5]["VOP2_INST_LITERAL_has_lit"] = IsArch5Vop2InstLiteralHasLit;
             arch_conditions_[5]["VOP2_INST_LITERAL_default"] = IsArch5Vop2InstLiteralDefault;
+            arch_conditions_[5]["VOP2_VOP_DPP8_has_dpp8"] = IsArch5Vop2VopDpp8HasDpp8;
+            arch_conditions_[5]["VOP2_VOP_DPP16_has_dpp16"] = IsArch5Vop2VopDpp16HasDpp16;
             arch_conditions_[5]["VOP3_default"] = IsArch5Vop3Default;
             arch_conditions_[5]["VOP3_INST_LITERAL_has_lit_0"] = IsArch5Vop3InstLiteralHasLit0;
             arch_conditions_[5]["VOP3_INST_LITERAL_has_lit_1"] = IsArch5Vop3InstLiteralHasLit1;
@@ -1503,9 +1655,9 @@ namespace amdisa
             arch_conditions_[5]["VOP3P_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch5Vop3pInstLiteralHasLit0HasLit2;
             arch_conditions_[5]["VOP3P_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch5Vop3pInstLiteralHasLit1HasLit2;
             arch_conditions_[5]["VOP3P_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch5Vop3pInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[5]["VOPC_VOP_SDWA_SDST_ENC_default"] = IsArch5VopcVopSdwaSdstEncDefault;
             arch_conditions_[5]["VOPC_default"] = IsArch5VopcDefault;
             arch_conditions_[5]["VOPC_INST_LITERAL_has_lit"] = IsArch5VopcInstLiteralHasLit;
+            arch_conditions_[5]["VOPC_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch5VopcVopSdwaSdstEncHasSdwa;
             arch_conditions_[5]["MIMG_default"] = IsArch5MimgDefault;
             arch_conditions_[5]["MIMG_NSA1_has_nsa_1"] = IsArch5MimgNsa1HasNsa1;
             arch_conditions_[5]["MIMG_NSA2_has_nsa_2"] = IsArch5MimgNsa2HasNsa2;
@@ -1521,12 +1673,12 @@ namespace amdisa
             arch_conditions_[5]["SOPC_INST_LITERAL_has_lit_1"] = IsArch5SopcInstLiteralHasLit1;
             arch_conditions_[5]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch5SopcInstLiteralHasLit0HasLit1;
             arch_conditions_[5]["VOP1_default"] = IsArch5Vop1Default;
-            arch_conditions_[5]["VOP1_VOP_DPP16_default"] = IsArch5Vop1VopDpp16Default;
-            arch_conditions_[5]["VOP1_VOP_DPP8_default"] = IsArch5Vop1VopDpp8Default;
-            arch_conditions_[5]["VOP1_VOP_SDWA_default"] = IsArch5Vop1VopSdwaDefault;
             arch_conditions_[5]["VOP1_INST_LITERAL_has_lit"] = IsArch5Vop1InstLiteralHasLit;
-            arch_conditions_[5]["VOP2_VOP_SDWA_default"] = IsArch5Vop2VopSdwaDefault;
-            arch_conditions_[5]["VOP2_VOP_SDWA_SDST_ENC_default"] = IsArch5Vop2VopSdwaSdstEncDefault;
+            arch_conditions_[5]["VOP1_VOP_SDWA_has_sdwa"] = IsArch5Vop1VopSdwaHasSdwa;
+            arch_conditions_[5]["VOP1_VOP_DPP8_has_dpp8"] = IsArch5Vop1VopDpp8HasDpp8;
+            arch_conditions_[5]["VOP1_VOP_DPP16_has_dpp16"] = IsArch5Vop1VopDpp16HasDpp16;
+            arch_conditions_[5]["VOP2_VOP_SDWA_has_sdwa"] = IsArch5Vop2VopSdwaHasSdwa;
+            arch_conditions_[5]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch5Vop2VopSdwaSdstEncHasSdwa;
             arch_conditions_[6]["VOP3_default"] = IsArch6Vop3Default;
             arch_conditions_[6]["VOP3_INST_LITERAL_has_lit_0"] = IsArch6Vop3InstLiteralHasLit0;
             arch_conditions_[6]["VOP3_INST_LITERAL_has_lit_1"] = IsArch6Vop3InstLiteralHasLit1;
@@ -1543,9 +1695,9 @@ namespace amdisa
             arch_conditions_[6]["VOP3P_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch6Vop3pInstLiteralHasLit0HasLit2;
             arch_conditions_[6]["VOP3P_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch6Vop3pInstLiteralHasLit1HasLit2;
             arch_conditions_[6]["VOP3P_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch6Vop3pInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[6]["VOPC_VOP_SDWA_SDST_ENC_default"] = IsArch6VopcVopSdwaSdstEncDefault;
             arch_conditions_[6]["VOPC_default"] = IsArch6VopcDefault;
             arch_conditions_[6]["VOPC_INST_LITERAL_has_lit"] = IsArch6VopcInstLiteralHasLit;
+            arch_conditions_[6]["VOPC_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch6VopcVopSdwaSdstEncHasSdwa;
             arch_conditions_[6]["MIMG_default"] = IsArch6MimgDefault;
             arch_conditions_[6]["MIMG_NSA1_has_nsa_1"] = IsArch6MimgNsa1HasNsa1;
             arch_conditions_[6]["MIMG_NSA2_has_nsa_2"] = IsArch6MimgNsa2HasNsa2;
@@ -1561,17 +1713,17 @@ namespace amdisa
             arch_conditions_[6]["SOPC_INST_LITERAL_has_lit_1"] = IsArch6SopcInstLiteralHasLit1;
             arch_conditions_[6]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch6SopcInstLiteralHasLit0HasLit1;
             arch_conditions_[6]["VOP1_default"] = IsArch6Vop1Default;
-            arch_conditions_[6]["VOP1_VOP_DPP16_default"] = IsArch6Vop1VopDpp16Default;
-            arch_conditions_[6]["VOP1_VOP_DPP8_default"] = IsArch6Vop1VopDpp8Default;
-            arch_conditions_[6]["VOP1_VOP_SDWA_default"] = IsArch6Vop1VopSdwaDefault;
             arch_conditions_[6]["VOP1_INST_LITERAL_has_lit"] = IsArch6Vop1InstLiteralHasLit;
-            arch_conditions_[6]["VOP2_VOP_DPP16_default"] = IsArch6Vop2VopDpp16Default;
-            arch_conditions_[6]["VOP2_VOP_DPP8_default"] = IsArch6Vop2VopDpp8Default;
-            arch_conditions_[6]["VOP2_VOP_SDWA_default"] = IsArch6Vop2VopSdwaDefault;
+            arch_conditions_[6]["VOP1_VOP_SDWA_has_sdwa"] = IsArch6Vop1VopSdwaHasSdwa;
+            arch_conditions_[6]["VOP1_VOP_DPP8_has_dpp8"] = IsArch6Vop1VopDpp8HasDpp8;
+            arch_conditions_[6]["VOP1_VOP_DPP16_has_dpp16"] = IsArch6Vop1VopDpp16HasDpp16;
             arch_conditions_[6]["VOP2_default"] = IsArch6Vop2Default;
             arch_conditions_[6]["VOP2_INST_LITERAL_has_lit"] = IsArch6Vop2InstLiteralHasLit;
             arch_conditions_[6]["VOP2_INST_LITERAL_default"] = IsArch6Vop2InstLiteralDefault;
-            arch_conditions_[6]["VOP2_VOP_SDWA_SDST_ENC_default"] = IsArch6Vop2VopSdwaSdstEncDefault;
+            arch_conditions_[6]["VOP2_VOP_SDWA_has_sdwa"] = IsArch6Vop2VopSdwaHasSdwa;
+            arch_conditions_[6]["VOP2_VOP_DPP8_has_dpp8"] = IsArch6Vop2VopDpp8HasDpp8;
+            arch_conditions_[6]["VOP2_VOP_DPP16_has_dpp16"] = IsArch6Vop2VopDpp16HasDpp16;
+            arch_conditions_[6]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch6Vop2VopSdwaSdstEncHasSdwa;
             arch_conditions_[6]["VOP3_SDST_ENC_default"] = IsArch6Vop3SdstEncDefault;
             arch_conditions_[6]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0"] = IsArch6Vop3SdstEncInstLiteralHasLit0;
             arch_conditions_[6]["VOP3_SDST_ENC_INST_LITERAL_has_lit_1"] = IsArch6Vop3SdstEncInstLiteralHasLit1;
@@ -1588,8 +1740,8 @@ namespace amdisa
             arch_conditions_[8]["VOP3_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch8Vop3InstLiteralHasLit0HasLit2;
             arch_conditions_[8]["VOP3_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch8Vop3InstLiteralHasLit1HasLit2;
             arch_conditions_[8]["VOP3_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch8Vop3InstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[8]["VOP3_VOP_DPP16_default"] = IsArch8Vop3VopDpp16Default;
-            arch_conditions_[8]["VOP3_VOP_DPP8_default"] = IsArch8Vop3VopDpp8Default;
+            arch_conditions_[8]["VOP3_VOP_DPP8_has_dpp8"] = IsArch8Vop3VopDpp8HasDpp8;
+            arch_conditions_[8]["VOP3_VOP_DPP16_has_dpp16"] = IsArch8Vop3VopDpp16HasDpp16;
             arch_conditions_[8]["VOP3P_default"] = IsArch8Vop3pDefault;
             arch_conditions_[8]["VOP3P_INST_LITERAL_has_lit_0"] = IsArch8Vop3pInstLiteralHasLit0;
             arch_conditions_[8]["VOP3P_INST_LITERAL_has_lit_1"] = IsArch8Vop3pInstLiteralHasLit1;
@@ -1598,15 +1750,21 @@ namespace amdisa
             arch_conditions_[8]["VOP3P_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch8Vop3pInstLiteralHasLit0HasLit2;
             arch_conditions_[8]["VOP3P_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch8Vop3pInstLiteralHasLit1HasLit2;
             arch_conditions_[8]["VOP3P_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch8Vop3pInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[8]["VOP3P_VOP_DPP16_default"] = IsArch8Vop3pVopDpp16Default;
-            arch_conditions_[8]["VOP3P_VOP_DPP8_default"] = IsArch8Vop3pVopDpp8Default;
-            arch_conditions_[8]["VOPC_VOP_DPP16_default"] = IsArch8VopcVopDpp16Default;
-            arch_conditions_[8]["VOPC_VOP_DPP8_default"] = IsArch8VopcVopDpp8Default;
+            arch_conditions_[8]["VOP3P_VOP_DPP8_has_dpp8"] = IsArch8Vop3pVopDpp8HasDpp8;
+            arch_conditions_[8]["VOP3P_VOP_DPP16_has_dpp16"] = IsArch8Vop3pVopDpp16HasDpp16;
             arch_conditions_[8]["VOPC_default"] = IsArch8VopcDefault;
             arch_conditions_[8]["VOPC_INST_LITERAL_has_lit"] = IsArch8VopcInstLiteralHasLit;
+            arch_conditions_[8]["VOPC_VOP_DPP8_has_dpp8"] = IsArch8VopcVopDpp8HasDpp8;
+            arch_conditions_[8]["VOPC_VOP_DPP16_has_dpp16"] = IsArch8VopcVopDpp16HasDpp16;
+            arch_conditions_[8]["VOPDX_VOPDXY_default"] = IsArch8VopdxVopdxyDefault;
+            arch_conditions_[8]["VOPDX_VOPDXY_INST_LITERAL_has_lit"] = IsArch8VopdxVopdxyInstLiteralHasLit;
+            arch_conditions_[8]["VOPDX_VOPDXY_INST_LITERAL_default"] = IsArch8VopdxVopdxyInstLiteralDefault;
+            arch_conditions_[8]["VOPDY_VOPDXY_default"] = IsArch8VopdyVopdxyDefault;
+            arch_conditions_[8]["VOPDY_VOPDXY_INST_LITERAL_has_lit"] = IsArch8VopdyVopdxyInstLiteralHasLit;
+            arch_conditions_[8]["VOPDY_VOPDXY_INST_LITERAL_default"] = IsArch8VopdyVopdxyInstLiteralDefault;
             arch_conditions_[8]["MIMG_default"] = IsArch8MimgDefault;
             arch_conditions_[8]["MIMG_NSA1_has_nsa"] = IsArch8MimgNsa1HasNsa;
-            arch_conditions_[8]["SOP1_default"] = IsArch8Sop1Default;
+            arch_conditions_[8]["SOP1_Nothas_lit_0_Nothas_lit_1"] = IsArch8Sop1NothasLit0NothasLit1;
             arch_conditions_[8]["SOP1_INST_LITERAL_has_lit_0"] = IsArch8Sop1InstLiteralHasLit0;
             arch_conditions_[8]["SOP2_default"] = IsArch8Sop2Default;
             arch_conditions_[8]["SOP2_INST_LITERAL_has_lit_0"] = IsArch8Sop2InstLiteralHasLit0;
@@ -1617,14 +1775,14 @@ namespace amdisa
             arch_conditions_[8]["SOPC_INST_LITERAL_has_lit_1"] = IsArch8SopcInstLiteralHasLit1;
             arch_conditions_[8]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch8SopcInstLiteralHasLit0HasLit1;
             arch_conditions_[8]["VOP1_default"] = IsArch8Vop1Default;
-            arch_conditions_[8]["VOP1_VOP_DPP16_default"] = IsArch8Vop1VopDpp16Default;
-            arch_conditions_[8]["VOP1_VOP_DPP8_default"] = IsArch8Vop1VopDpp8Default;
             arch_conditions_[8]["VOP1_INST_LITERAL_has_lit"] = IsArch8Vop1InstLiteralHasLit;
-            arch_conditions_[8]["VOP2_VOP_DPP16_default"] = IsArch8Vop2VopDpp16Default;
-            arch_conditions_[8]["VOP2_VOP_DPP8_default"] = IsArch8Vop2VopDpp8Default;
+            arch_conditions_[8]["VOP1_VOP_DPP8_has_dpp8"] = IsArch8Vop1VopDpp8HasDpp8;
+            arch_conditions_[8]["VOP1_VOP_DPP16_has_dpp16"] = IsArch8Vop1VopDpp16HasDpp16;
             arch_conditions_[8]["VOP2_default"] = IsArch8Vop2Default;
             arch_conditions_[8]["VOP2_INST_LITERAL_has_lit"] = IsArch8Vop2InstLiteralHasLit;
             arch_conditions_[8]["VOP2_INST_LITERAL_default"] = IsArch8Vop2InstLiteralDefault;
+            arch_conditions_[8]["VOP2_VOP_DPP8_has_dpp8"] = IsArch8Vop2VopDpp8HasDpp8;
+            arch_conditions_[8]["VOP2_VOP_DPP16_has_dpp16"] = IsArch8Vop2VopDpp16HasDpp16;
             arch_conditions_[8]["VOP3_SDST_ENC_default"] = IsArch8Vop3SdstEncDefault;
             arch_conditions_[8]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0"] = IsArch8Vop3SdstEncInstLiteralHasLit0;
             arch_conditions_[8]["VOP3_SDST_ENC_INST_LITERAL_has_lit_1"] = IsArch8Vop3SdstEncInstLiteralHasLit1;
@@ -1633,8 +1791,8 @@ namespace amdisa
             arch_conditions_[8]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch8Vop3SdstEncInstLiteralHasLit0HasLit2;
             arch_conditions_[8]["VOP3_SDST_ENC_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch8Vop3SdstEncInstLiteralHasLit1HasLit2;
             arch_conditions_[8]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch8Vop3SdstEncInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[8]["VOP3_SDST_ENC_VOP_DPP16_default"] = IsArch8Vop3SdstEncVopDpp16Default;
-            arch_conditions_[8]["VOP3_SDST_ENC_VOP_DPP8_default"] = IsArch8Vop3SdstEncVopDpp8Default;
+            arch_conditions_[8]["VOP3_SDST_ENC_VOP_DPP8_has_dpp8"] = IsArch8Vop3SdstEncVopDpp8HasDpp8;
+            arch_conditions_[8]["VOP3_SDST_ENC_VOP_DPP16_has_dpp16"] = IsArch8Vop3SdstEncVopDpp16HasDpp16;
             arch_conditions_[9]["VOP3_default"] = IsArch9Vop3Default;
             arch_conditions_[9]["VOP3_INST_LITERAL_has_lit_0"] = IsArch9Vop3InstLiteralHasLit0;
             arch_conditions_[9]["VOP3_INST_LITERAL_has_lit_1"] = IsArch9Vop3InstLiteralHasLit1;
@@ -1643,8 +1801,8 @@ namespace amdisa
             arch_conditions_[9]["VOP3_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch9Vop3InstLiteralHasLit0HasLit2;
             arch_conditions_[9]["VOP3_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch9Vop3InstLiteralHasLit1HasLit2;
             arch_conditions_[9]["VOP3_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch9Vop3InstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[9]["VOP3_VOP_DPP16_default"] = IsArch9Vop3VopDpp16Default;
-            arch_conditions_[9]["VOP3_VOP_DPP8_default"] = IsArch9Vop3VopDpp8Default;
+            arch_conditions_[9]["VOP3_VOP_DPP8_has_dpp8"] = IsArch9Vop3VopDpp8HasDpp8;
+            arch_conditions_[9]["VOP3_VOP_DPP16_has_dpp16"] = IsArch9Vop3VopDpp16HasDpp16;
             arch_conditions_[9]["VOP3P_default"] = IsArch9Vop3pDefault;
             arch_conditions_[9]["VOP3P_INST_LITERAL_has_lit_0"] = IsArch9Vop3pInstLiteralHasLit0;
             arch_conditions_[9]["VOP3P_INST_LITERAL_has_lit_1"] = IsArch9Vop3pInstLiteralHasLit1;
@@ -1653,15 +1811,21 @@ namespace amdisa
             arch_conditions_[9]["VOP3P_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch9Vop3pInstLiteralHasLit0HasLit2;
             arch_conditions_[9]["VOP3P_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch9Vop3pInstLiteralHasLit1HasLit2;
             arch_conditions_[9]["VOP3P_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch9Vop3pInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[9]["VOP3P_VOP_DPP16_default"] = IsArch9Vop3pVopDpp16Default;
-            arch_conditions_[9]["VOP3P_VOP_DPP8_default"] = IsArch9Vop3pVopDpp8Default;
-            arch_conditions_[9]["VOPC_VOP_DPP16_default"] = IsArch9VopcVopDpp16Default;
-            arch_conditions_[9]["VOPC_VOP_DPP8_default"] = IsArch9VopcVopDpp8Default;
+            arch_conditions_[9]["VOP3P_VOP_DPP8_has_dpp8"] = IsArch9Vop3pVopDpp8HasDpp8;
+            arch_conditions_[9]["VOP3P_VOP_DPP16_has_dpp16"] = IsArch9Vop3pVopDpp16HasDpp16;
             arch_conditions_[9]["VOPC_default"] = IsArch9VopcDefault;
             arch_conditions_[9]["VOPC_INST_LITERAL_has_lit"] = IsArch9VopcInstLiteralHasLit;
+            arch_conditions_[9]["VOPC_VOP_DPP8_has_dpp8"] = IsArch9VopcVopDpp8HasDpp8;
+            arch_conditions_[9]["VOPC_VOP_DPP16_has_dpp16"] = IsArch9VopcVopDpp16HasDpp16;
+            arch_conditions_[9]["VOPDX_VOPDXY_default"] = IsArch9VopdxVopdxyDefault;
+            arch_conditions_[9]["VOPDX_VOPDXY_INST_LITERAL_has_lit"] = IsArch9VopdxVopdxyInstLiteralHasLit;
+            arch_conditions_[9]["VOPDX_VOPDXY_INST_LITERAL_default"] = IsArch9VopdxVopdxyInstLiteralDefault;
+            arch_conditions_[9]["VOPDY_VOPDXY_default"] = IsArch9VopdyVopdxyDefault;
+            arch_conditions_[9]["VOPDY_VOPDXY_INST_LITERAL_has_lit"] = IsArch9VopdyVopdxyInstLiteralHasLit;
+            arch_conditions_[9]["VOPDY_VOPDXY_INST_LITERAL_default"] = IsArch9VopdyVopdxyInstLiteralDefault;
             arch_conditions_[9]["MIMG_default"] = IsArch9MimgDefault;
             arch_conditions_[9]["MIMG_NSA1_has_nsa"] = IsArch9MimgNsa1HasNsa;
-            arch_conditions_[9]["SOP1_default"] = IsArch9Sop1Default;
+            arch_conditions_[9]["SOP1_Nothas_lit_0_Nothas_lit_1"] = IsArch9Sop1NothasLit0NothasLit1;
             arch_conditions_[9]["SOP1_INST_LITERAL_has_lit_0"] = IsArch9Sop1InstLiteralHasLit0;
             arch_conditions_[9]["SOP2_default"] = IsArch9Sop2Default;
             arch_conditions_[9]["SOP2_INST_LITERAL_has_lit_0"] = IsArch9Sop2InstLiteralHasLit0;
@@ -1673,14 +1837,14 @@ namespace amdisa
             arch_conditions_[9]["SOPC_INST_LITERAL_has_lit_1"] = IsArch9SopcInstLiteralHasLit1;
             arch_conditions_[9]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch9SopcInstLiteralHasLit0HasLit1;
             arch_conditions_[9]["VOP1_default"] = IsArch9Vop1Default;
-            arch_conditions_[9]["VOP1_VOP_DPP16_default"] = IsArch9Vop1VopDpp16Default;
-            arch_conditions_[9]["VOP1_VOP_DPP8_default"] = IsArch9Vop1VopDpp8Default;
             arch_conditions_[9]["VOP1_INST_LITERAL_has_lit"] = IsArch9Vop1InstLiteralHasLit;
-            arch_conditions_[9]["VOP2_VOP_DPP16_default"] = IsArch9Vop2VopDpp16Default;
-            arch_conditions_[9]["VOP2_VOP_DPP8_default"] = IsArch9Vop2VopDpp8Default;
+            arch_conditions_[9]["VOP1_VOP_DPP8_has_dpp8"] = IsArch9Vop1VopDpp8HasDpp8;
+            arch_conditions_[9]["VOP1_VOP_DPP16_has_dpp16"] = IsArch9Vop1VopDpp16HasDpp16;
             arch_conditions_[9]["VOP2_default"] = IsArch9Vop2Default;
             arch_conditions_[9]["VOP2_INST_LITERAL_has_lit"] = IsArch9Vop2InstLiteralHasLit;
             arch_conditions_[9]["VOP2_INST_LITERAL_default"] = IsArch9Vop2InstLiteralDefault;
+            arch_conditions_[9]["VOP2_VOP_DPP8_has_dpp8"] = IsArch9Vop2VopDpp8HasDpp8;
+            arch_conditions_[9]["VOP2_VOP_DPP16_has_dpp16"] = IsArch9Vop2VopDpp16HasDpp16;
             arch_conditions_[9]["VOP3_SDST_ENC_default"] = IsArch9Vop3SdstEncDefault;
             arch_conditions_[9]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0"] = IsArch9Vop3SdstEncInstLiteralHasLit0;
             arch_conditions_[9]["VOP3_SDST_ENC_INST_LITERAL_has_lit_1"] = IsArch9Vop3SdstEncInstLiteralHasLit1;
@@ -1689,8 +1853,8 @@ namespace amdisa
             arch_conditions_[9]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch9Vop3SdstEncInstLiteralHasLit0HasLit2;
             arch_conditions_[9]["VOP3_SDST_ENC_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch9Vop3SdstEncInstLiteralHasLit1HasLit2;
             arch_conditions_[9]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch9Vop3SdstEncInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[9]["VOP3_SDST_ENC_VOP_DPP16_default"] = IsArch9Vop3SdstEncVopDpp16Default;
-            arch_conditions_[9]["VOP3_SDST_ENC_VOP_DPP8_default"] = IsArch9Vop3SdstEncVopDpp8Default;
+            arch_conditions_[9]["VOP3_SDST_ENC_VOP_DPP8_has_dpp8"] = IsArch9Vop3SdstEncVopDpp8HasDpp8;
+            arch_conditions_[9]["VOP3_SDST_ENC_VOP_DPP16_has_dpp16"] = IsArch9Vop3SdstEncVopDpp16HasDpp16;
             arch_conditions_[10]["VOP3_default"] = IsArch10Vop3Default;
             arch_conditions_[10]["VOP3_INST_LITERAL_has_lit_0"] = IsArch10Vop3InstLiteralHasLit0;
             arch_conditions_[10]["VOP3_INST_LITERAL_has_lit_1"] = IsArch10Vop3InstLiteralHasLit1;
@@ -1699,8 +1863,10 @@ namespace amdisa
             arch_conditions_[10]["VOP3_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch10Vop3InstLiteralHasLit0HasLit2;
             arch_conditions_[10]["VOP3_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch10Vop3InstLiteralHasLit1HasLit2;
             arch_conditions_[10]["VOP3_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch10Vop3InstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[10]["VOP3_VOP_DPP16_default"] = IsArch10Vop3VopDpp16Default;
-            arch_conditions_[10]["VOP3_VOP_DPP8_default"] = IsArch10Vop3VopDpp8Default;
+            arch_conditions_[10]["VOP3_VOP_DPP8_has_dpp8"] = IsArch10Vop3VopDpp8HasDpp8;
+            arch_conditions_[10]["VOP3_VOP_DPP16_has_dpp16"] = IsArch10Vop3VopDpp16HasDpp16;
+            arch_conditions_[10]["SOP1_Nothas_lit_0_Nothas_lit_1"] = IsArch10Sop1NothasLit0NothasLit1;
+            arch_conditions_[10]["SOP1_INST_LITERAL_has_lit_0"] = IsArch10Sop1InstLiteralHasLit0;
             arch_conditions_[10]["VOP3P_default"] = IsArch10Vop3pDefault;
             arch_conditions_[10]["VOP3P_INST_LITERAL_has_lit_0"] = IsArch10Vop3pInstLiteralHasLit0;
             arch_conditions_[10]["VOP3P_INST_LITERAL_has_lit_1"] = IsArch10Vop3pInstLiteralHasLit1;
@@ -1709,35 +1875,36 @@ namespace amdisa
             arch_conditions_[10]["VOP3P_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch10Vop3pInstLiteralHasLit0HasLit2;
             arch_conditions_[10]["VOP3P_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch10Vop3pInstLiteralHasLit1HasLit2;
             arch_conditions_[10]["VOP3P_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch10Vop3pInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[10]["SOP1_default"] = IsArch10Sop1Default;
-            arch_conditions_[10]["SOP1_INST_LITERAL_has_lit_0"] = IsArch10Sop1InstLiteralHasLit0;
-            arch_conditions_[10]["VOP3P_VOP_DPP16_default"] = IsArch10Vop3pVopDpp16Default;
-            arch_conditions_[10]["VOP3P_VOP_DPP8_default"] = IsArch10Vop3pVopDpp8Default;
-            arch_conditions_[10]["VOPC_VOP_DPP16_default"] = IsArch10VopcVopDpp16Default;
-            arch_conditions_[10]["VOPC_VOP_DPP8_default"] = IsArch10VopcVopDpp8Default;
+            arch_conditions_[10]["VOP3P_VOP_DPP8_has_dpp8"] = IsArch10Vop3pVopDpp8HasDpp8;
+            arch_conditions_[10]["VOP3P_VOP_DPP16_has_dpp16"] = IsArch10Vop3pVopDpp16HasDpp16;
             arch_conditions_[10]["VOPC_default"] = IsArch10VopcDefault;
             arch_conditions_[10]["VOPC_INST_LITERAL_has_lit"] = IsArch10VopcInstLiteralHasLit;
+            arch_conditions_[10]["VOPC_VOP_DPP8_has_dpp8"] = IsArch10VopcVopDpp8HasDpp8;
+            arch_conditions_[10]["VOPC_VOP_DPP16_has_dpp16"] = IsArch10VopcVopDpp16HasDpp16;
             arch_conditions_[10]["SOP2_default"] = IsArch10Sop2Default;
             arch_conditions_[10]["SOP2_INST_LITERAL_has_lit_0"] = IsArch10Sop2InstLiteralHasLit0;
             arch_conditions_[10]["SOP2_INST_LITERAL_has_lit_1"] = IsArch10Sop2InstLiteralHasLit1;
             arch_conditions_[10]["SOP2_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch10Sop2InstLiteralHasLit0HasLit1;
             arch_conditions_[10]["SOP2_INST_LITERAL_default"] = IsArch10Sop2InstLiteralDefault;
-            arch_conditions_[10]["VOPDXY_default"] = IsArch10VopdxyDefault;
-            arch_conditions_[10]["VOPDXY_INST_LITERAL_has_lit"] = IsArch10VopdxyInstLiteralHasLit;
-            arch_conditions_[10]["VOPDXY_INST_LITERAL_default"] = IsArch10VopdxyInstLiteralDefault;
+            arch_conditions_[10]["VOPDX_VOPDXY_default"] = IsArch10VopdxVopdxyDefault;
+            arch_conditions_[10]["VOPDX_VOPDXY_INST_LITERAL_has_lit"] = IsArch10VopdxVopdxyInstLiteralHasLit;
+            arch_conditions_[10]["VOPDX_VOPDXY_INST_LITERAL_default"] = IsArch10VopdxVopdxyInstLiteralDefault;
+            arch_conditions_[10]["VOPDY_VOPDXY_default"] = IsArch10VopdyVopdxyDefault;
+            arch_conditions_[10]["VOPDY_VOPDXY_INST_LITERAL_has_lit"] = IsArch10VopdyVopdxyInstLiteralHasLit;
+            arch_conditions_[10]["VOPDY_VOPDXY_INST_LITERAL_default"] = IsArch10VopdyVopdxyInstLiteralDefault;
             arch_conditions_[10]["SOPC_default"] = IsArch10SopcDefault;
             arch_conditions_[10]["SOPC_INST_LITERAL_has_lit_0"] = IsArch10SopcInstLiteralHasLit0;
             arch_conditions_[10]["SOPC_INST_LITERAL_has_lit_1"] = IsArch10SopcInstLiteralHasLit1;
             arch_conditions_[10]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch10SopcInstLiteralHasLit0HasLit1;
             arch_conditions_[10]["VOP1_default"] = IsArch10Vop1Default;
-            arch_conditions_[10]["VOP1_VOP_DPP16_default"] = IsArch10Vop1VopDpp16Default;
-            arch_conditions_[10]["VOP1_VOP_DPP8_default"] = IsArch10Vop1VopDpp8Default;
             arch_conditions_[10]["VOP1_INST_LITERAL_has_lit"] = IsArch10Vop1InstLiteralHasLit;
-            arch_conditions_[10]["VOP2_VOP_DPP16_default"] = IsArch10Vop2VopDpp16Default;
-            arch_conditions_[10]["VOP2_VOP_DPP8_default"] = IsArch10Vop2VopDpp8Default;
+            arch_conditions_[10]["VOP1_VOP_DPP8_has_dpp8"] = IsArch10Vop1VopDpp8HasDpp8;
+            arch_conditions_[10]["VOP1_VOP_DPP16_has_dpp16"] = IsArch10Vop1VopDpp16HasDpp16;
             arch_conditions_[10]["VOP2_default"] = IsArch10Vop2Default;
             arch_conditions_[10]["VOP2_INST_LITERAL_has_lit"] = IsArch10Vop2InstLiteralHasLit;
             arch_conditions_[10]["VOP2_INST_LITERAL_default"] = IsArch10Vop2InstLiteralDefault;
+            arch_conditions_[10]["VOP2_VOP_DPP8_has_dpp8"] = IsArch10Vop2VopDpp8HasDpp8;
+            arch_conditions_[10]["VOP2_VOP_DPP16_has_dpp16"] = IsArch10Vop2VopDpp16HasDpp16;
             arch_conditions_[10]["VOP3_SDST_ENC_default"] = IsArch10Vop3SdstEncDefault;
             arch_conditions_[10]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0"] = IsArch10Vop3SdstEncInstLiteralHasLit0;
             arch_conditions_[10]["VOP3_SDST_ENC_INST_LITERAL_has_lit_1"] = IsArch10Vop3SdstEncInstLiteralHasLit1;
@@ -1746,31 +1913,31 @@ namespace amdisa
             arch_conditions_[10]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0_has_lit_2"] = IsArch10Vop3SdstEncInstLiteralHasLit0HasLit2;
             arch_conditions_[10]["VOP3_SDST_ENC_INST_LITERAL_has_lit_1_has_lit_2"] = IsArch10Vop3SdstEncInstLiteralHasLit1HasLit2;
             arch_conditions_[10]["VOP3_SDST_ENC_INST_LITERAL_has_lit_0_has_lit_1_has_lit_2"] = IsArch10Vop3SdstEncInstLiteralHasLit0HasLit1HasLit2;
-            arch_conditions_[10]["VOP3_SDST_ENC_VOP_DPP16_default"] = IsArch10Vop3SdstEncVopDpp16Default;
-            arch_conditions_[10]["VOP3_SDST_ENC_VOP_DPP8_default"] = IsArch10Vop3SdstEncVopDpp8Default;
-            arch_conditions_[0]["VOPC_default"] = IsArch0VopcDefault;
-            arch_conditions_[0]["VOPC_INST_LITERAL_has_lit"] = IsArch0VopcInstLiteralHasLit;
-            arch_conditions_[0]["VOPC_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch0VopcVopSdwaSdstEncHasSdwa;
-            arch_conditions_[0]["SOP1_default"] = IsArch0Sop1Default;
-            arch_conditions_[0]["SOP1_INST_LITERAL_has_lit_0"] = IsArch0Sop1InstLiteralHasLit0;
-            arch_conditions_[0]["SOP2_default"] = IsArch0Sop2Default;
-            arch_conditions_[0]["SOP2_INST_LITERAL_has_lit_0"] = IsArch0Sop2InstLiteralHasLit0;
-            arch_conditions_[0]["SOP2_INST_LITERAL_has_lit_1"] = IsArch0Sop2InstLiteralHasLit1;
-            arch_conditions_[0]["SOP2_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch0Sop2InstLiteralHasLit0HasLit1;
-            arch_conditions_[0]["SOPC_default"] = IsArch0SopcDefault;
-            arch_conditions_[0]["SOPC_INST_LITERAL_has_lit_0"] = IsArch0SopcInstLiteralHasLit0;
-            arch_conditions_[0]["SOPC_INST_LITERAL_has_lit_1"] = IsArch0SopcInstLiteralHasLit1;
-            arch_conditions_[0]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch0SopcInstLiteralHasLit0HasLit1;
-            arch_conditions_[0]["VOP1_default"] = IsArch0Vop1Default;
-            arch_conditions_[0]["VOP1_INST_LITERAL_has_lit"] = IsArch0Vop1InstLiteralHasLit;
-            arch_conditions_[0]["VOP1_VOP_DPP_has_dpp"] = IsArch0Vop1VopDppHasDpp;
-            arch_conditions_[0]["VOP1_VOP_SDWA_has_sdwa"] = IsArch0Vop1VopSdwaHasSdwa;
-            arch_conditions_[0]["VOP2_default"] = IsArch0Vop2Default;
-            arch_conditions_[0]["VOP2_INST_LITERAL_has_lit"] = IsArch0Vop2InstLiteralHasLit;
-            arch_conditions_[0]["VOP2_INST_LITERAL_default"] = IsArch0Vop2InstLiteralDefault;
-            arch_conditions_[0]["VOP2_VOP_DPP_has_dpp"] = IsArch0Vop2VopDppHasDpp;
-            arch_conditions_[0]["VOP2_VOP_SDWA_has_sdwa"] = IsArch0Vop2VopSdwaHasSdwa;
-            arch_conditions_[0]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch0Vop2VopSdwaSdstEncHasSdwa;
+            arch_conditions_[10]["VOP3_SDST_ENC_VOP_DPP8_has_dpp8"] = IsArch10Vop3SdstEncVopDpp8HasDpp8;
+            arch_conditions_[10]["VOP3_SDST_ENC_VOP_DPP16_has_dpp16"] = IsArch10Vop3SdstEncVopDpp16HasDpp16;
+            arch_conditions_[12]["VOPC_default"] = IsArch12VopcDefault;
+            arch_conditions_[12]["VOPC_INST_LITERAL_has_lit"] = IsArch12VopcInstLiteralHasLit;
+            arch_conditions_[12]["VOPC_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch12VopcVopSdwaSdstEncHasSdwa;
+            arch_conditions_[12]["SOP1_default"] = IsArch12Sop1Default;
+            arch_conditions_[12]["SOP1_INST_LITERAL_has_lit_0"] = IsArch12Sop1InstLiteralHasLit0;
+            arch_conditions_[12]["SOP2_default"] = IsArch12Sop2Default;
+            arch_conditions_[12]["SOP2_INST_LITERAL_has_lit_0"] = IsArch12Sop2InstLiteralHasLit0;
+            arch_conditions_[12]["SOP2_INST_LITERAL_has_lit_1"] = IsArch12Sop2InstLiteralHasLit1;
+            arch_conditions_[12]["SOP2_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch12Sop2InstLiteralHasLit0HasLit1;
+            arch_conditions_[12]["SOPC_default"] = IsArch12SopcDefault;
+            arch_conditions_[12]["SOPC_INST_LITERAL_has_lit_0"] = IsArch12SopcInstLiteralHasLit0;
+            arch_conditions_[12]["SOPC_INST_LITERAL_has_lit_1"] = IsArch12SopcInstLiteralHasLit1;
+            arch_conditions_[12]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch12SopcInstLiteralHasLit0HasLit1;
+            arch_conditions_[12]["VOP1_default"] = IsArch12Vop1Default;
+            arch_conditions_[12]["VOP1_INST_LITERAL_has_lit"] = IsArch12Vop1InstLiteralHasLit;
+            arch_conditions_[12]["VOP1_VOP_DPP_has_dpp"] = IsArch12Vop1VopDppHasDpp;
+            arch_conditions_[12]["VOP1_VOP_SDWA_has_sdwa"] = IsArch12Vop1VopSdwaHasSdwa;
+            arch_conditions_[12]["VOP2_default"] = IsArch12Vop2Default;
+            arch_conditions_[12]["VOP2_INST_LITERAL_has_lit"] = IsArch12Vop2InstLiteralHasLit;
+            arch_conditions_[12]["VOP2_INST_LITERAL_default"] = IsArch12Vop2InstLiteralDefault;
+            arch_conditions_[12]["VOP2_VOP_DPP_has_dpp"] = IsArch12Vop2VopDppHasDpp;
+            arch_conditions_[12]["VOP2_VOP_SDWA_has_sdwa"] = IsArch12Vop2VopSdwaHasSdwa;
+            arch_conditions_[12]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch12Vop2VopSdwaSdstEncHasSdwa;
             arch_conditions_[1]["VOPC_default"] = IsArch1VopcDefault;
             arch_conditions_[1]["VOPC_INST_LITERAL_has_lit"] = IsArch1VopcInstLiteralHasLit;
             arch_conditions_[1]["VOPC_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch1VopcVopSdwaSdstEncHasSdwa;
@@ -1840,6 +2007,29 @@ namespace amdisa
             arch_conditions_[3]["VOP2_VOP_DPP_has_dpp"] = IsArch3Vop2VopDppHasDpp;
             arch_conditions_[3]["VOP2_VOP_SDWA_has_sdwa"] = IsArch3Vop2VopSdwaHasSdwa;
             arch_conditions_[3]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch3Vop2VopSdwaSdstEncHasSdwa;
+            arch_conditions_[0]["VOPC_default"] = IsArch0VopcDefault;
+            arch_conditions_[0]["VOPC_INST_LITERAL_has_lit"] = IsArch0VopcInstLiteralHasLit;
+            arch_conditions_[0]["VOPC_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch0VopcVopSdwaSdstEncHasSdwa;
+            arch_conditions_[0]["SOP1_default"] = IsArch0Sop1Default;
+            arch_conditions_[0]["SOP1_INST_LITERAL_has_lit_0"] = IsArch0Sop1InstLiteralHasLit0;
+            arch_conditions_[0]["SOP2_default"] = IsArch0Sop2Default;
+            arch_conditions_[0]["SOP2_INST_LITERAL_has_lit_0"] = IsArch0Sop2InstLiteralHasLit0;
+            arch_conditions_[0]["SOP2_INST_LITERAL_has_lit_1"] = IsArch0Sop2InstLiteralHasLit1;
+            arch_conditions_[0]["SOP2_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch0Sop2InstLiteralHasLit0HasLit1;
+            arch_conditions_[0]["SOPC_default"] = IsArch0SopcDefault;
+            arch_conditions_[0]["SOPC_INST_LITERAL_has_lit_0"] = IsArch0SopcInstLiteralHasLit0;
+            arch_conditions_[0]["SOPC_INST_LITERAL_has_lit_1"] = IsArch0SopcInstLiteralHasLit1;
+            arch_conditions_[0]["SOPC_INST_LITERAL_has_lit_0_has_lit_1"] = IsArch0SopcInstLiteralHasLit0HasLit1;
+            arch_conditions_[0]["VOP1_default"] = IsArch0Vop1Default;
+            arch_conditions_[0]["VOP1_INST_LITERAL_has_lit"] = IsArch0Vop1InstLiteralHasLit;
+            arch_conditions_[0]["VOP1_VOP_DPP_has_dpp"] = IsArch0Vop1VopDppHasDpp;
+            arch_conditions_[0]["VOP1_VOP_SDWA_has_sdwa"] = IsArch0Vop1VopSdwaHasSdwa;
+            arch_conditions_[0]["VOP2_default"] = IsArch0Vop2Default;
+            arch_conditions_[0]["VOP2_INST_LITERAL_has_lit"] = IsArch0Vop2InstLiteralHasLit;
+            arch_conditions_[0]["VOP2_INST_LITERAL_default"] = IsArch0Vop2InstLiteralDefault;
+            arch_conditions_[0]["VOP2_VOP_DPP_has_dpp"] = IsArch0Vop2VopDppHasDpp;
+            arch_conditions_[0]["VOP2_VOP_SDWA_has_sdwa"] = IsArch0Vop2VopSdwaHasSdwa;
+            arch_conditions_[0]["VOP2_VOP_SDWA_SDST_ENC_has_sdwa"] = IsArch0Vop2VopSdwaSdstEncHasSdwa;
         }
 
         using EncodingsToConditionFunctions = std::map<std::string, std::function<bool(uint64_t)>>;

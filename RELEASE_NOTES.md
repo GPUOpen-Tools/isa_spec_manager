@@ -4,10 +4,11 @@
 
 AMD's machine-readable GPU Instruction Set Architecture specifications is a set of XML files that describe AMD's latest GPU ISA: instructions, encodings, operands, data formats and even human-readable description strings. 
 
-The first release includes the specification XML files for the following GPU architectures:
-* AMD CDNA™ 3 (Instinct™ MI300)
-* AMD CDNA™ 2 (Instinct™ MI200)
-* AMD CDNA™ 1 (Instinct™ MI100)
+The release includes the specification XML files for the following GPU architectures:
+* AMD CDNA™ 4 (AMD MI350 Instinct™)
+* AMD CDNA™ 3 (AMD MI300 Instinct™)
+* AMD CDNA™ 2 (AMD MI200 Instinct™)
+* AMD CDNA™ 1 (AMD MI100 Instinct™)
 * AMD RDNA™ 3
 * AMD RDNA™ 2
 * AMD RDNA™ 1
@@ -24,21 +25,17 @@ For usage examples and instructions on how to build the project, please see [sou
 **Note:** while the `IsaDecoder` API is a good way to get started with parsing the XML files, nothing prevents you from parsing the files yourself and building your own custom workflow. To do that please refer to the XML schema documentation [XML schema documentation](https://github.com/GPUOpen-Tools/isa_spec_manager/blob/main/documentation/spec_documentation.md).
 
 New in this release:
-* Added support for operand subtypes (requires XML schema version `v1.1.0`).
-* Introducing the experimental `explorer::Spec` API for iterating over the elements of a given specification file. See the [documentation](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/documentation) and [examples](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/source/examples) subfolders for more details.
-* On Windows, the solution is now generated for the VS2022 toolchain by default.
-* Unit tests are now part of the repository.
-* Bug fixes and performance improvements.
+* Fixed decoding of `MIMG` instructions (such as `IMAGE_STORE` and `IMAGE_LOAD`)
+* Fixed decoding of `MUBUF` and `MTBUF` instructions of RDNA™2 targets in binary representation.
+* Fixed an issue where `DS` instructions returned the wrong operands when decoded via `IsaDecoder::DecodeInstruction()` with an `uint64_t` argument.
+* The `explorer` API now supports Functional Groups.
+* Added basic test for the `explorer` API.
+* Documentation updates.
+
 
 ## Known issues ##
 
 ### Specification ###
 * Information about encoding modifiers is not provided in the specification.
-* `S_ATOMIC_*` instructions have a `VMEM` functional group (instead of `SMEM`).
 
 ### API and tools ###
-
-* Decoding of `MIMG` instructions (such as `IMAGE_STORE` and `IMAGE_LOAD`) may produce the wrong register indices for source vector register operands.
-* Decoding binary representation of certain RDNA™2 `MIMG`, `MUBUF` and `MTBUF` instructions may produce the wrong results.
-* Decoding `DS` instructions may return the wrong operands when decoded via `IsaDecoder::DecodeInstruction()` with an `uint64_t` argument.
-

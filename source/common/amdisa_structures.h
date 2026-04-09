@@ -201,6 +201,10 @@ namespace amdisa
         bool        is_implicit     = false;
         bool        is_in_microcode = false;
 
+        // Some instructions decode the operand
+        // as list of registers. For example, BVH.
+        bool        is_list         = false;
+
         operator std::string() const noexcept;
         friend std::ostream& operator<<(std::ostream& os, const Operand& op);
     };
@@ -247,7 +251,7 @@ namespace amdisa
         bool is_program_terminator = false;
 
         std::string functional_group_name;
-        std::string functional_subgroup_name;
+        std::vector<std::string> functional_subgroups;
 
         operator std::string() const noexcept;
         friend std::ostream& operator<<(std::ostream& os, const Instruction& ins);

@@ -71,7 +71,10 @@ bool DecodeInstructionStream(
     std::vector<InstructionInfoBundle>& instruction_info_stream,
     std::string& err_message) const;
 ```
-Decodes a sequence of binary instructions. 
+Decodes a sequence of binary instructions.
+
+> [!NOTE]
+> Branch resolution will not be performed when decoding a single instruction. If branch resolution is required,  use DecodeShaderDisassemblyText() or DecodeShaderDisassemblyFile() with the flag for branch target resolution set to `true`.
 
 ### Parameters
 parameter name | type | description | input/output
@@ -128,6 +131,9 @@ bool DecodeInstruction(uint64_t machine_code,
     std::string& err_message) const;
 ```
 Decodes a single instruction encoded in binary format. This API is limited to a 64-bit instruction. If the instruction of interest is longer than 64 bits, `amdisa::IsaDecoder::DecodeInstructionStream` should be used instead.
+
+> [!NOTE]
+> Branch resolution will not be performed when decoding a single instruction. If branch resolution is required,  use DecodeShaderDisassemblyText() or DecodeShaderDisassemblyFile() with the flag for branch target resolution set to `true`.
 
 ### Parameters
 parameter name | type | description | input/output
