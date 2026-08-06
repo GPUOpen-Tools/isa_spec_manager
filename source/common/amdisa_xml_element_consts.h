@@ -15,7 +15,6 @@ namespace amdisa
     static const char* kElementLicense       = "License";
     static const char* kElementDate          = "ReleaseDate";
     static const char* kElementIsa           = "ISA";
-    static const char* kElementIsaSemantics  = "ISASemantics";
     static const char* kElementSchemaVersion = "SchemaVersion";
 
     // Architecture specific elements.
@@ -37,6 +36,7 @@ namespace amdisa
     static const char* kElementEncodingConditions     = "EncodingConditions";
     static const char* kElementEncodingCondition      = "EncodingCondition";
     static const char* kElementConditionName          = "ConditionName";
+    static const char* kElementConditionId            = "ConditionId";
     static const char* kElementConditionExpression    = "CondtionExpression";
 
     // Field specific elements.
@@ -137,6 +137,7 @@ namespace amdisa
     static const char* kAttributeIsConditional             = "IsConditional";
     static const char* kAttributeRangeCount                = "RangeCount";
     static const char* kAttributeOrder                     = "Order";
+    static const char* kAttributeId                        = "Id";
     static const char* kAttributeOperator                  = "Operator";
     static const char* kAttributeInput                     = "Input";
     static const char* kAttributeOutput                    = "Output";

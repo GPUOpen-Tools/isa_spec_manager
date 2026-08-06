@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
 cmake_minimum_required(VERSION 3.10)
 
 # Setting project directories.
@@ -31,6 +31,7 @@ set (ALL_H
     ${SRC_DIR}/common/amdisa_xml_element_consts.h
     ${SRC_DIR}/common/amdisa_utility.h
     ${SRC_DIR}/common/isa_xml_reader.h
+    ${SRC_DIR}/common/xml_expression_tree_reader.h
 
     # Third party library headers.
     ${TINYXML_DIR}/tinyxml2.h
@@ -41,11 +42,14 @@ set (ALL_CPP
     # Top interface source file.
     ./isa_decoder.cpp
     ./encoding_condition_handler.hpp
+    ./v1_1_1/isa_decoder_v1_1_1.cpp
+    ./v1_1_1/encoding_condition_handler_v1_1_1.h
 
     # Local library source files.
     ${SRC_DIR}/common/amdisa_utility.cpp
     ${SRC_DIR}/common/amdisa_structures.cpp
     ${SRC_DIR}/common/isa_xml_reader.cpp
+    ${SRC_DIR}/common/xml_expression_tree_reader.cpp
 
     # Third party source files.
     ${TINYXML_DIR}/tinyxml2.cpp
@@ -53,7 +57,7 @@ set (ALL_CPP
 
 # Adding target.
 # Static Library
-add_library(isa_decoder STATIC ${ALL_CPP})
+add_library(isa_decoder STATIC EXCLUDE_FROM_ALL ${ALL_CPP})
 target_include_directories(isa_decoder PRIVATE
     ${SRC_DIR}/common
     ${TINYXML_DIR}
@@ -62,7 +66,7 @@ target_include_directories(isa_decoder PRIVATE
 )
 
 # Dynamic Library
-add_library(isa_decoder_dynamic SHARED ${ALL_CPP})
+add_library(isa_decoder_dynamic SHARED EXCLUDE_FROM_ALL ${ALL_CPP})
 target_include_directories(isa_decoder_dynamic PRIVATE
     ${SRC_DIR}/common
     ${TINYXML_DIR}

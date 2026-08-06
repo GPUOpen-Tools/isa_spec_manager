@@ -8,7 +8,7 @@ project(isa_spec_manager)
 if (LINUX)
     set(CMAKE_CXX_COMPILER g++)
 endif ()
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${FLAGS})
 
 # Enable using folders to group projects on Windows (Visual Studio solution).
@@ -26,8 +26,6 @@ endif ()
 # and provides interface for decoding of instructions or data retrieval
 # for specific instructions in the architecture.
 add_subdirectory(./source/isa_decoder)
-# ISA explorer API
-add_subdirectory(./source/isa_explorer)
 
 if (EXCLUDE_ISA_CLI_EXAMPLES_TESTS)
     message("-- Excluding CLI, examples and tests.")
@@ -38,6 +36,9 @@ else()
     # CLI commands: provides command line interface implementation
     # for generation of various CLI programs.
     add_subdirectory(./source/isa_spec_cli)
+
+    # ISA explorer API
+    add_subdirectory(./source/isa_explorer)
 
     # Unit testing suite
     add_subdirectory(./test/source)

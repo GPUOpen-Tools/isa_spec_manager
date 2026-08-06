@@ -1,16 +1,18 @@
 /*
- * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
  */
 #ifndef ISA_XML_READER_H_
 #define ISA_XML_READER_H_
 
 // C++ libraries.
+#include <vector>
 #include <string>
 
 namespace amdisa
 {
     // Forward declarations.
     struct IsaSpec;
+    struct EncodingCondition;
 
     class IsaXmlReader
     {
@@ -32,6 +34,16 @@ namespace amdisa
          * Returns true on success or false on error, in which case err_message is populated with an appropriate human-readable error string.
          */
         static bool ReadSpec(const char *input_xml_data, const size_t datalen, IsaSpec& spec_data, std::string& err_message);
+
+        /*
+         * ReadEncodingConditionExpressionTrees --
+         *
+         * Reads expression trees for encoding conditions from ISA Spec XML.
+         *
+         * Returns true on success or false on error, in which case err_message is populated with an appropriate human-readable error string.
+         */
+        static bool ReadEncodingConditionExpressionTrees(const std::string& path_to_input_xml,
+            std::vector<EncodingCondition>& encoding_conditions, uint32_t& architecture_id, std::string& err_message);
 
         // Explicitly remove the constructors and assignment operators.
         IsaXmlReader()                               = delete;

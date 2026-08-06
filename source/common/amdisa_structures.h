@@ -164,7 +164,22 @@ namespace amdisa
     struct Condition
     {
         std::string           name;
+        uint32_t              id = 0;
         GenericExpressionNode expression;
+    };
+
+    // Encoding condition. This structure is used for isolated
+    // parsing of encoding conditions.
+    struct EncodingCondition
+    {
+        uint32_t                                  encoding_order = 0;
+        uint32_t                                  condition_id = 0;
+        std::string                               encoding_name;
+        std::string                               condition_name;
+
+        // Map condition IDs to the root of the expression tree that describes the condition.
+        std::map<uint32_t, GenericExpressionNode> map_id_to_condition_root;
+        MicrocodeFormat                           microcode_format;
     };
 
     // Information describing encodings.
@@ -215,17 +230,13 @@ namespace amdisa
     {
         std::string          name;
         std::string          condition_name;
+        uint32_t             condition_id = 0;
+        uint32_t             encoding_order = 0;
         uint32_t             opcode = 0;
         std::vector<Operand> operands;
 
         operator std::string() const noexcept;
         friend std::ostream& operator<<(std::ostream& os, const InstructionEncoding& ie);
-    };
-
-    struct InstructionSemantics
-    {
-        bool                  is_defined = false;
-        GenericExpressionNode semantic_expression;
     };
 
     // Information describing instructions.
@@ -235,7 +246,6 @@ namespace amdisa
         std::vector<std::string>         aliased_names;
         std::string                      description;
         std::vector<InstructionEncoding> encodings;
-        InstructionSemantics             semantics;
 
         // True if this instruction is a branch, false otherwise.
         bool is_branch             = false;

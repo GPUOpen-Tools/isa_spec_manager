@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
  */
 #include "isa_xml_reader.h"
 
@@ -18,6 +18,7 @@
 #include "amdisa_structures.h"
 #include "amdisa_utility.h"
 #include "amdisa_xml_element_consts.h"
+#include "xml_expression_tree_reader.h"
 
 namespace amdisa
 {
@@ -32,6 +33,7 @@ namespace amdisa
 
     // Error string constants.
     static const char* kStringErrorXmlReadError = "Error: Failed to read XML file.";
+    static const char* kStringErrorXmlReadErrorNoEncodingOrder = "Error: Encoding order was not recorded.";
     static const char* kStringErrorXmlReadErrorExpressionTreeTypeAttributeNotFound =
         "Error: Failed to read expression tree. Type attribute of an expression "
         "not found.";
@@ -813,6 +815,7 @@ namespace amdisa
                 {
                     // Retrieve encoding condition data.
                     XmlElement* condition_name_element       = GetElementByName(kElementConditionName, *encoding_condition_iterator);
+                    XmlElement* condition_id_element       = GetElementByName(kElementConditionId, *encoding_condition_iterator);
                     XmlElement* condition_expression_element = GetElementByName(kElementConditionExpression, *encoding_condition_iterator);
 
                     bool is_condition_retrieved = condition_name_element != nullptr && condition_expression_element != nullptr;
@@ -825,6 +828,10 @@ namespace amdisa
 
                         // Populate condition information.
                         condition.name = ExtractText(condition_name_element);
+                        if (condition_id_element != nullptr)
+                        {
+                            condition.id = std::stoi(ExtractText(condition_id_element));
+                        }
                     }
                     else
                     {
@@ -996,6 +1003,21 @@ namespace amdisa
                         instruction_encoding.name   = ExtractText(encoding_name_element);
                         instruction_encoding.condition_name = ExtractText(encoding_condition_element);
                         instruction_encoding.opcode = std::stoi(ExtractText(opcode_element));
+                        XmlError condition_id_read_error = encoding_condition_element->QueryUnsignedAttribute(kAttributeId, &instruction_encoding.condition_id);
+
+                        // Get encoding order.
+                        const auto& encoding_iter = std::find_if(spec_data.encodings.begin(), spec_data.encodings.end(), [&](const Encoding& encoding) {
+                            return encoding.name == instruction_encoding.name;
+                        });
+                        if (encoding_iter != spec_data.encodings.end())
+                        {
+                            instruction_encoding.encoding_order = encoding_iter->order;
+                        }
+                        else
+                        {
+                            should_abort = true;
+                            err_message  = kStringErrorXmlReadErrorNoEncodingOrder;
+                        }
 
                         // Form the operands iterator. Instruction encoding maynot have
                         // operands.
@@ -1504,5 +1526,118 @@ namespace amdisa
       }
 
       return ParseSpecFromXML(xml_document, spec_data, err_message);
+    }
+
+    bool IsaXmlReader::ReadEncodingConditionExpressionTrees(const std::string& path_to_input_xml,
+        std::vector<EncodingCondition>& encoding_conditions, uint32_t& architecture_id, std::string& err_message)
+    {
+        bool is_read_successful = true;
+
+        // Load the XML.
+        XmlDocument    xml_document;
+        const XmlError err = xml_document.LoadFile(path_to_input_xml.c_str());
+        if (err != tinyxml2::XML_SUCCESS)
+        {
+            err_message = kStringErrorXmlReadError;
+            is_read_successful = false;
+        }
+
+        if (is_read_successful)
+        {
+            // Get ISA element.
+            XmlElement* isa_element;
+            isa_element = GetElementByName(kElementIsa, xml_document.FirstChildElement());
+            if (isa_element == nullptr)
+            {
+                is_read_successful = false;
+                err_message        = kStringErrorXmlReadError;
+            }
+
+            // Get architecture ID.
+            if (is_read_successful)
+            {
+                XmlElement* architecture_element      = GetElementByName(kElementArchitecture, isa_element);
+                XmlElement* architecture_name_element = GetElementByName(kElementArchitectureName, architecture_element);
+                XmlElement* architecture_id_element   = GetElementByName(kElementArchitectureId, architecture_element);
+
+                bool is_retrieve_successful = architecture_element != nullptr && architecture_name_element != nullptr &&
+                    architecture_id_element != nullptr;
+
+                if (is_retrieve_successful)
+                {
+                    architecture_id = std::stoi(ExtractText(architecture_id_element));
+                }
+                else
+                {
+                    is_read_successful = false;
+                    err_message        = kStringErrorXmlReadError;
+                }
+            }
+
+            // Go over all individual encoding XML elements.
+            XmlElement* encodings_element      = GetElementByName(kElementEncodings, isa_element);
+            XmlIterator encodings_xml_iterator = XmlIterator(encodings_element->FirstChildElement());
+            bool should_abort = false;
+            while (!should_abort && encodings_xml_iterator.IsValid())
+            {
+                // Populate new entry.
+                encoding_conditions.push_back(EncodingCondition());
+                auto& single_encoding_condition = encoding_conditions.back();
+
+                // Get encodings XML element.
+                uint32_t    encoding_order                   = 0;
+                XmlError    encoding_order_read_err          = encodings_xml_iterator->QueryUnsignedAttribute(kAttributeOrder, &encoding_order);
+                XmlElement* encoding_name_element            = GetElementByName(kElementEncodingName, *encodings_xml_iterator);
+
+                single_encoding_condition.encoding_name = ExtractText(encoding_name_element);
+                single_encoding_condition.encoding_order = encoding_order;
+
+                // Retrieve encoding conditions.
+                XmlElement* encoding_conditions_element = GetElementByName(kElementEncodingConditions, *encodings_xml_iterator);
+                XmlElement* microcode_format_element    = GetElementByName(kElementMicrocodeFormat, *encodings_xml_iterator);
+
+                // Handle microcode format.
+                if (microcode_format_element != nullptr)
+                {
+                    bool is_read = ReadMicrocodeFormat(microcode_format_element, single_encoding_condition.microcode_format);
+                    if (!is_read)
+                    {
+                        should_abort = true;
+                    }
+                }
+
+                // Handle encoding conditions.
+                XmlIterator encoding_condition_iterator = XmlIterator(encoding_conditions_element->FirstChildElement());
+                while (!should_abort && encoding_condition_iterator.IsValid())
+                {
+                    // Retrieve encoding condition data.
+                    XmlElement* condition_name_element       = GetElementByName(kElementConditionName, *encoding_condition_iterator);
+                    XmlElement* condition_id_element       = GetElementByName(kElementConditionId, *encoding_condition_iterator);
+                    XmlElement* condition_expression_element = GetElementByName(kElementConditionExpression, *encoding_condition_iterator);
+
+                    bool is_condition_retrieved = condition_id_element != nullptr && condition_expression_element != nullptr;
+
+                    if (is_condition_retrieved)
+                    {
+                        // Populate condition information.
+                        uint32_t condition_id = std::stoi(ExtractText(condition_id_element));
+                        single_encoding_condition.condition_id = condition_id;
+                        single_encoding_condition.condition_name = ExtractText(condition_name_element);
+                        XmlExpressionTreeReader::ReadExpressionTree(
+                            condition_expression_element, single_encoding_condition.map_id_to_condition_root[condition_id], err_message);
+                    }
+                    else
+                    {
+                        should_abort = true;
+                    }
+
+                    ++encoding_condition_iterator;
+                }
+
+                ++encodings_xml_iterator;
+            }
+        }
+
+        return is_read_successful;
     }
 }  // namespace amdisa

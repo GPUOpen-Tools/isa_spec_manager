@@ -18,7 +18,8 @@ static void GetTestCaseSingle(const amdisa::GpuArchitecture architecture,
 {
     machine_code = 0x80000002;
     instruction_name = "S_ADD_U32";
-    if (architecture == amdisa::GpuArchitecture::kRdna4)
+    if (architecture == amdisa::GpuArchitecture::kRdna4 ||
+        architecture == amdisa::GpuArchitecture::kCdna5)
     {
         instruction_name = "S_ADD_CO_U32";
     }
@@ -29,7 +30,8 @@ static void GetTestCaseStream(const amdisa::GpuArchitecture architecture,
 {
     machine_code_stream = { 0x801FFF1F, 0x00000000 };
     instruction_name = "S_ADD_U32";
-    if (architecture == amdisa::GpuArchitecture::kRdna4)
+    if (architecture == amdisa::GpuArchitecture::kRdna4 ||
+        architecture == amdisa::GpuArchitecture::kCdna5)
     {
         instruction_name = "S_ADD_CO_U32";
     }

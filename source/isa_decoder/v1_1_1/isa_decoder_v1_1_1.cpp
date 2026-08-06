@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
  */
-#include "amdisa/isa_decoder.h"
+#include "../isa_decoder_strategy.h"
 
 // C++ libraries.
 #include <algorithm>
+#include <memory>
 #include <cassert>
 #include <deque>
 #include <fstream>
@@ -22,11 +23,13 @@
 #include "amdisa_structures.h"
 #include "amdisa_utility.h"
 #include "amdisa/api_version.h"
-#include "encoding_condition_handler.hpp"
-#include "isa_decoder_strategy.h"
+#include "encoding_condition_handler_v1_1_1.h"
 #include "isa_xml_reader.h"
 
 namespace amdisa
+{
+// Anonymous namespace to prevent symbol conflicts with the default decoder.
+namespace
 {
     // Error string constants.
     static const char* kStringErrorEmptyRange                  = "Error: Processing empty range.";
@@ -51,7 +54,6 @@ namespace amdisa
     static const char* kStringErrorManagerImplAllocationFailed = "Error: Manager Implementation object allocation failed";
     static const char* kStringErrorEmptyRangesInField          = "Error: Range is empty for the field: ";
     static const char* kStringErrorEncodingIdentifiersNotFound = "Error: Could not find the encoding identifier for the instruction.";
-    static const char* kStringErrorMoreThanOneEncodings        = "Error: Encoding has more than a single match. This should imply decoding errors.";
 
     // Decoder manager string constants.
     static const char* kStringErrorDecodeManagerUnknownArch  = "Error: Undefined architecture in specification.";
@@ -90,7 +92,6 @@ namespace amdisa
                                                                               {1, GpuArchitecture::kCdna2},
                                                                               {2, GpuArchitecture::kCdna3},
                                                                               {3, GpuArchitecture::kCdna4},
-                                                                              {4, GpuArchitecture::kCdna5},
                                                                               {5, GpuArchitecture::kRdna1},
                                                                               {6, GpuArchitecture::kRdna2},
                                                                               {8, GpuArchitecture::kRdna3},
@@ -1239,7 +1240,7 @@ namespace amdisa
                                               const IdToInstruction&          id_to_inst,
                                               const IdToInstructionEncodings& id_to_inst_enc,
                                               const Encoding&                 encoding,
-                                              const EncodingConditionHandler& condition_handler,
+                                              const v1_1_1::EncodingConditionHandler& condition_handler,
                                               uint32_t                        first_dword,
                                               uint32_t                        second_dword,
                                               bool                            is_vopdx,
@@ -1290,43 +1291,35 @@ namespace amdisa
                 uint32_t matched_encodings = 0;
                 for (const auto& inst_enc_ptr : inst_enc_vec)
                 {
-                    // No need to check Y part for vopdx and vise versa.
-                    if (is_vopdx && inst_enc_ptr->name.find("_Y") != std::string::npos
-                        || is_vopdy && inst_enc_ptr->name.find("_X") != std::string::npos)
-                    {
-                        continue;
-                    }
-
                     if (condition_handler.arch_conditions_.find(architecture_id) != condition_handler.arch_conditions_.end())
                     {
-                        // Get encodings to conditions based on achitecture id.
-                        const auto&    kEncodingToConditions = condition_handler.arch_conditions_.at(architecture_id);
-                        const uint32_t kEncodingOrder        = inst_enc_ptr->encoding_order + 1;
-
-                        // Get conditions based on the encoding order.
-                        if (kEncodingToConditions.find(kEncodingOrder) != kEncodingToConditions.end())
+                        const auto& conditions    = condition_handler.arch_conditions_.at(architecture_id);
+                        std::string encoding_name = inst_enc_ptr->name;
+                        if (encoding_name.find("ENC_") == 0)
                         {
-                            const auto&    kConditionIdToConditionFunc = kEncodingToConditions.at(kEncodingOrder);
-                            const uint32_t kConditionId                = inst_enc_ptr->condition_id;
+                            encoding_name = encoding_name.substr(4);
+                        }
+                        encoding_name += "_" + inst_enc_ptr->condition_name;
 
-                            // Get the condition function based on the condition id.
-                            if (kConditionIdToConditionFunc.find(kConditionId) != kConditionIdToConditionFunc.end())
+                        if (is_vopdx)
+                        {
+                            encoding_name = "VOPDX_" + encoding_name;
+                        }
+                        else if (is_vopdy)
+                        {
+                            encoding_name = "VOPDY_" + encoding_name;
+                        }
+
+                        if (conditions.find(encoding_name) != conditions.end())
+                        {
+                            auto& IsEncodingMatch = conditions.at(encoding_name);
+                            if (IsEncodingMatch((static_cast<uint64_t>(second_dword) << 32) | first_dword))
                             {
-                                auto& EncodingMatch = kConditionIdToConditionFunc.at(kConditionId);
-                                if (EncodingMatch((static_cast<uint64_t>(second_dword) << 32) | first_dword))
-                                {
-                                    found_ptrs.instruction_encoding_ptr = inst_enc_ptr;
-                                    matched_encodings++;
-                                }
+                                found_ptrs.instruction_encoding_ptr = inst_enc_ptr;
+                                matched_encodings++;
                             }
                         }
                     }
-                }
-                // Only 1 encoding must be picked.
-                if (matched_encodings != 1)
-                {
-                    std::cerr << kStringErrorMoreThanOneEncodings << std::endl;
-                    std::cerr << "  Instruction: " << found_ptrs.instruction_ptr->name << ": " << std::hex << second_dword << "_" << first_dword << std::endl;
                 }
                 assert(matched_encodings == 1);
             }
@@ -1480,69 +1473,15 @@ namespace amdisa
 
     // *** INTERNALLY-LINKED AUXILIARY FUNCTIONS - END ***
 
-    // Tracks the VGPR MSB state set by S_SET_VGPR_MSB across a decoded instruction stream.
-    // CDNA5 extends VGPR addressing from 8 bits to 10 bits via two MSB bits stored in MODE register.
-    struct VgprMsbState
-    {
-        uint8_t dst  = 0;  // bits [7:6] of SIMM8 immediate
-        uint8_t src0 = 0;  // bits [1:0]
-        uint8_t src1 = 0;  // bits [3:2]
-        uint8_t src2 = 0;  // bits [5:4]
+}  // anonymous namespace
 
-        void Update(uint8_t imm8)
-        {
-            src0 = (imm8 >> 0) & 0x3;
-            src1 = (imm8 >> 2) & 0x3;
-            src2 = (imm8 >> 4) & 0x3;
-            dst  = (imm8 >> 6) & 0x3;
-        }
-
-        bool IsActive() const { return (dst | src0 | src1 | src2) != 0; }
-
-        // Returns the MSB value for the given encoding field name.
-        // Returns 0 if the field does not use VGPR-MSB offset.
-        // Field names are verified against the CDNA5 XML spec.
-        uint8_t GetMsbForField(const std::string& field_name) const
-        {
-            // DST slot: VDST, VDSTX, VDSTY (VOP*), VDATA (VBUFFER)
-            if (field_name == "VDST"  || field_name == "VDSTX" ||
-                field_name == "VDSTY" || field_name == "VDATA")
-                return dst;
-            // SRC0 slot: SRC0 (VOP*), ADDR (VDS/VFLAT), VADDR (VBUFFER)
-            if (field_name == "SRC0" || field_name == "ADDR" ||
-                field_name == "VADDR")
-                return src0;
-            // SRC1 slot: SRC1 (VOP*), VSRC (VFLAT), DATA0 (VDS)
-            if (field_name == "SRC1" || field_name == "VSRC" ||
-                field_name == "DATA0")
-                return src1;
-            // SRC2 slot: SRC2 (VOP3), DATA1 (VDS)
-            if (field_name == "SRC2" || field_name == "DATA1")
-                return src2;
-            return 0;
-        }
-    };
-
-    // Schemas below this version are routed to a legacy strategy.
-    static const char* kDefaultXmlSchemaVersion = "1.2.0";
-
-    namespace v1_1_1 { IIsaDecoderStrategy* CreateIsaDecoder(std::vector<std::string>& log); }
-
-    static IIsaDecoderStrategy* CreateLegacyIsaDecoderForSchema(const std::string& schema_version, std::vector<std::string>& log)
-    {
-        if (schema_version < kDefaultXmlSchemaVersion)
-        {
-            return v1_1_1::CreateIsaDecoder(log);
-        }
-        return nullptr;
-    }
-
-    // Default strategy for v1.2.0+ XML schemas.
-    class IsaDecoderDefaultStrategy : public IIsaDecoderStrategy
+namespace v1_1_1
+{
+    // v1.1.1 internal data and initialisation.
+    class IsaDecoderPImpl
     {
     public:
-        explicit IsaDecoderDefaultStrategy(std::vector<std::string>& log) : log_(log) {}
-
+        explicit IsaDecoderPImpl(std::vector<std::string>& log) : log_(log) {}
         IsaSpec& GetSpec()
         {
             return spec_data_;
@@ -1553,126 +1492,16 @@ namespace amdisa
             return spec_data_;
         }
 
-        bool InitializeFromSpec(IsaSpec&& spec, std::string& err) override
+        bool IsInitialized() const
         {
-            spec_data_ = std::move(spec);
-            return Initialize(err);
+            return is_initialized_;
         }
 
-        GpuArchitecture GetArchitecture() const override
+        void SetInitialized(bool is_initialized)
         {
-            return GetArchitectureWithId(spec_data_.architecture.id);
+            is_initialized_ = is_initialized;
         }
 
-        bool DecodeInstruction(uint64_t machine_code, InstructionInfoBundle& instruction_info_bundle, std::string& err_message) const override;
-        bool DecodeInstruction(const std::string& instruction_name, InstructionInfo& instruction_info, std::string& err_message) const override;
-        bool DecodeInstructionStream(const std::vector<uint32_t>& machine_code_stream,
-                                     std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                     std::string& err_message) const override;
-        bool DecodeShaderDisassemblyText(const std::string& shader_disassembly_text,
-                                          std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                          std::string& err_message,
-                                          bool resolve_direct_branch_targets) const override;
-        bool DecodeShaderDisassemblyFile(const std::string& shader_disassembly_file,
-                                          std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                          std::string& err_message,
-                                          bool resolve_direct_branch_targets) const override;
-
-        void MapIdentifierToEncoding(uint64_t identifier, std::shared_ptr<Encoding> encoding_ptr)
-        {
-            if (identifier_to_encoding_.find(identifier) == identifier_to_encoding_.end())
-            {
-                identifier_to_encoding_[identifier] = encoding_ptr;
-            }
-        }
-
-        IdToEncoding& GetEncodingMap()
-        {
-            return identifier_to_encoding_;
-        }
-
-        const IdToEncoding& GetEncodingMap() const
-        {
-            return identifier_to_encoding_;
-        }
-
-        void MapIdentifierToInstruction(uint64_t identifier, std::shared_ptr<Instruction> instr_ptr)
-        {
-            if (identifier_to_instruction_.find(identifier) == identifier_to_instruction_.end())
-            {
-                identifier_to_instruction_[identifier] = instr_ptr;
-            }
-            else
-            {
-                if (identifier_to_instruction_[identifier]->name != instr_ptr->name)
-                {
-                    log_.push_back(kStringWarningApiInitSameMappingInst);
-                }
-            }
-        }
-
-        IdToInstruction& GetInstructionMap()
-        {
-            return identifier_to_instruction_;
-        }
-
-        const IdToInstruction& GetInstructionMap() const
-        {
-            return identifier_to_instruction_;
-        }
-
-        void MapIdentifierToInstructionEncoding(uint64_t identifier, std::shared_ptr<InstructionEncoding> instr_enc_ptr)
-        {
-            auto&       instr_enc_vec  = identifier_to_instruction_encoding_vec_[identifier];
-            const auto& instr_enc_iter = std::find_if(instr_enc_vec.begin(), instr_enc_vec.end(), [&](std::shared_ptr<InstructionEncoding> pushed_instr_enc) {
-                return (pushed_instr_enc->name == instr_enc_ptr->name) && (pushed_instr_enc->condition_name == instr_enc_ptr->condition_name);
-            });
-            if (instr_enc_iter == instr_enc_vec.end())
-            {
-                identifier_to_instruction_encoding_vec_[identifier].push_back(instr_enc_ptr);
-            }
-            else if ((instr_enc_ptr->name.find("VOPD") == std::string::npos) && (instr_enc_ptr->name.find("FLAT") == std::string::npos))
-            {
-                log_.push_back(kStringWarningApiInitSameMappingEnc);
-            }
-        }
-
-        IdToInstructionEncodings& GetInstructionEncodingMap()
-        {
-            return identifier_to_instruction_encoding_vec_;
-        }
-
-        const IdToInstructionEncodings& GetInstructionEncodingMap() const
-        {
-            return identifier_to_instruction_encoding_vec_;
-        }
-
-        EncodingConditionHandler& GetEncodingConditionHandler()
-        {
-            return condition_handler_;
-        }
-
-        const EncodingConditionHandler& GetEncodingConditionHandler() const
-        {
-            return condition_handler_;
-        }
-
-        std::vector<std::string>& GetLog() const
-        {
-            return log_;
-        }
-
-        mimg_workaround::AcntHandler& GetMimgAcntTable()
-        {
-            return mimg_acnt_table_;
-        }
-
-        const mimg_workaround::AcntHandler& GetMimgAcntTable() const
-        {
-            return mimg_acnt_table_;
-        }
-
-    private:
         bool Initialize(std::string& err_message)
         {
             // Check compatibility.
@@ -1819,6 +1648,110 @@ namespace amdisa
             return is_compatible && is_isa_spec_parsed;
         }
 
+        void MapIdentifierToEncoding(uint64_t identifier, std::shared_ptr<Encoding> encoding_ptr)
+        {
+            if (identifier_to_encoding_.find(identifier) == identifier_to_encoding_.end())
+            {
+                identifier_to_encoding_[identifier] = encoding_ptr;
+            }
+        }
+
+        IdToEncoding& GetEncodingMap()
+        {
+            return identifier_to_encoding_;
+        }
+
+        void MapIdentifierToInstruction(uint64_t identifier, std::shared_ptr<Instruction> instr_ptr)
+        {
+            if (identifier_to_instruction_.find(identifier) == identifier_to_instruction_.end())
+            {
+                identifier_to_instruction_[identifier] = instr_ptr;
+            }
+            else
+            {
+                if (identifier_to_instruction_[identifier]->name != instr_ptr->name)
+                {
+                    log_.push_back(kStringWarningApiInitSameMappingInst);
+                }
+            }
+        }
+
+        IdToInstruction& GetInstructionMap()
+        {
+            return identifier_to_instruction_;
+        }
+
+        void MapIdentifierToInstructionEncoding(uint64_t identifier, std::shared_ptr<InstructionEncoding> instr_enc_ptr)
+        {
+            auto&       instr_enc_vec  = identifier_to_instruction_encoding_vec_[identifier];
+            const auto& instr_enc_iter = std::find_if(instr_enc_vec.begin(), instr_enc_vec.end(), [&](std::shared_ptr<InstructionEncoding> pushed_instr_enc) {
+                return (pushed_instr_enc->name == instr_enc_ptr->name) && (pushed_instr_enc->condition_name == instr_enc_ptr->condition_name);
+            });
+            if (instr_enc_iter == instr_enc_vec.end())
+            {
+                identifier_to_instruction_encoding_vec_[identifier].push_back(instr_enc_ptr);
+            }
+            else if ((instr_enc_ptr->name.find("VOPD") == std::string::npos) && (instr_enc_ptr->name.find("FLAT") == std::string::npos))
+            {
+                log_.push_back(kStringWarningApiInitSameMappingEnc);
+            }
+        }
+
+        IdToInstructionEncodings& GetInstructionEncodingMap()
+        {
+            return identifier_to_instruction_encoding_vec_;
+        }
+
+        v1_1_1::EncodingConditionHandler& GetEncodingConditionHandler()
+        {
+            return condition_handler_;
+        }
+
+        std::vector<std::string>& GetLog() const
+        {
+            return log_;
+        }
+
+        mimg_workaround::AcntHandler& GetMimgAcntTable()
+        {
+            return mimg_acnt_table_;
+        }
+
+    private:
+        IsaSpec spec_data_;
+        bool is_initialized_ = false;
+        IdToEncoding identifier_to_encoding_;
+        IdToInstruction identifier_to_instruction_;
+        IdToInstructionEncodings identifier_to_instruction_encoding_vec_;
+        v1_1_1::EncodingConditionHandler condition_handler_;
+        std::vector<std::string>& log_;
+        mimg_workaround::AcntHandler mimg_acnt_table_;
+    };
+
+    class IsaDecoder : public IIsaDecoderStrategy
+    {
+    public:
+        explicit IsaDecoder(std::vector<std::string>& log) : data_(std::make_unique<IsaDecoderPImpl>(log)) {}
+
+        bool InitializeFromSpec(IsaSpec&& spec, std::string& err) override
+        {
+            data_->GetSpec() = std::move(spec);
+            data_->SetInitialized(true);
+            return data_->Initialize(err);
+        }
+
+        GpuArchitecture GetArchitecture() const override
+        {
+            return GetArchitectureWithId(data_->GetSpec().architecture.id);
+        }
+
+        bool DecodeInstruction(uint64_t machine_code, InstructionInfoBundle& info, std::string& err) const override;
+        bool DecodeInstruction(const std::string& name, InstructionInfo& info, std::string& err) const override;
+        bool DecodeInstructionStream(const std::vector<uint32_t>& stream, std::vector<InstructionInfoBundle>& info, std::string& err) const override;
+        bool DecodeShaderDisassemblyText(const std::string& text, std::vector<InstructionInfoBundle>& info, std::string& err, bool resolve) const override;
+        bool DecodeShaderDisassemblyFile(const std::string& file, std::vector<InstructionInfoBundle>& info, std::string& err, bool resolve) const override;
+
+    private:
         bool DecodeShaderDisassembly(const std::string&                                  shader_disassembly_text,
                                      std::vector<InstructionInfoBundle>&                 instruction_info_stream,
                                      std::string&                                        err_message,
@@ -1826,75 +1759,15 @@ namespace amdisa
                                      const std::vector<std::string>&                     pc_to_index_map,
                                      const std::unordered_map<std::string, std::string>& pc_to_label_map) const;
 
-        IsaSpec spec_data_;
-        IdToEncoding identifier_to_encoding_;
-        IdToInstruction identifier_to_instruction_;
-        IdToInstructionEncodings identifier_to_instruction_encoding_vec_;
-        EncodingConditionHandler condition_handler_;
-        std::vector<std::string>& log_;
-        mimg_workaround::AcntHandler mimg_acnt_table_;
+        std::unique_ptr<IsaDecoderPImpl> data_;
     };
 
-    // Reads XML, selects the appropriate strategy, and forwards decode calls.
-    class IsaDecoder::IsaDecoderImpl
-    {
-    public:
-        IsaDecoderImpl() = default;
-        ~IsaDecoderImpl() { delete pStrategy_; }
-
-        bool Initialize(const std::string& input_xml_file_path, std::string& err_message);
-        bool Initialize(const char* input_xml_data, size_t datalen, std::string& err_message);
-
-        GpuArchitecture GetArchitecture() const { return pStrategy_->GetArchitecture(); }
-
-        bool DecodeInstruction(uint64_t machine_code, InstructionInfoBundle& info, std::string& err) const
-        {
-            return pStrategy_->DecodeInstruction(machine_code, info, err);
-        }
-
-        bool DecodeInstruction(const std::string& name, InstructionInfo& info, std::string& err) const
-        {
-            return pStrategy_->DecodeInstruction(name, info, err);
-        }
-
-        bool DecodeInstructionStream(const std::vector<uint32_t>& stream,
-                                     std::vector<InstructionInfoBundle>& info,
-                                     std::string& err) const
-        {
-            return pStrategy_->DecodeInstructionStream(stream, info, err);
-        }
-
-        bool DecodeShaderDisassemblyText(const std::string& text,
-                                          std::vector<InstructionInfoBundle>& info,
-                                          std::string& err,
-                                          bool resolve) const
-        {
-            return pStrategy_->DecodeShaderDisassemblyText(text, info, err, resolve);
-        }
-
-        bool DecodeShaderDisassemblyFile(const std::string& file,
-                                          std::vector<InstructionInfoBundle>& info,
-                                          std::string& err,
-                                          bool resolve) const
-        {
-            return pStrategy_->DecodeShaderDisassemblyFile(file, info, err, resolve);
-        }
-
-        std::vector<std::string> GetDebugLog() const { return log_; }
-
-    private:
-        bool InitializeStrategy(IsaSpec&& spec, std::string& err_message);
-
-        IIsaDecoderStrategy* pStrategy_ = nullptr;
-        std::vector<std::string> log_;
-    };
-
-    bool IsaDecoderDefaultStrategy::DecodeShaderDisassembly(const std::string&                                  shader_disassembly_text,
-                                                              std::vector<InstructionInfoBundle>&                 instruction_info_stream,
-                                                              std::string&                                        err_message,
-                                                              bool                                                resolve_direct_branch_targets,
-                                                              const std::vector<std::string>&                     pc_to_index_map,
-                                                              const std::unordered_map<std::string, std::string>& pc_to_label_map) const
+    bool IsaDecoder::DecodeShaderDisassembly(const std::string&                                  shader_disassembly_text,
+                                              std::vector<InstructionInfoBundle>&                 instruction_info_stream,
+                                              std::string&                                        err_message,
+                                              bool                                                resolve_direct_branch_targets,
+                                              const std::vector<std::string>&                     pc_to_index_map,
+                                              const std::unordered_map<std::string, std::string>& pc_to_label_map) const
     {
         bool is_success = true;
 
@@ -1989,7 +1862,7 @@ namespace amdisa
 
                 std::stringstream err_ss;
                 err_ss << kStringErrorShaderTextDecodeFailed << "(" << inst << ")";
-                log_.push_back(err_ss.str());
+                data_->GetLog().push_back(err_ss.str());
             }
         }
 
@@ -2047,130 +1920,122 @@ namespace amdisa
         return is_success;
     }
 
-    bool IsaDecoder::IsaDecoderImpl::InitializeStrategy(IsaSpec&& spec, std::string& err_message)
-    {
-        const std::string& schema_version = spec.info.schema_version;
-        delete pStrategy_;
-        pStrategy_ = nullptr;
-
-        if (!schema_version.empty() && schema_version < kDefaultXmlSchemaVersion)
-        {
-            pStrategy_ = CreateLegacyIsaDecoderForSchema(schema_version, log_);
-        }
-        else
-        {
-            pStrategy_ = new IsaDecoderDefaultStrategy(log_);
-        }
-
-        if (pStrategy_ == nullptr)
-        {
-            err_message = kStringErrorApiImplAllocationFailed;
-            return false;
-        }
-
-        return pStrategy_->InitializeFromSpec(std::move(spec), err_message);
-    }
-
-    bool IsaDecoder::IsaDecoderImpl::Initialize(const std::string& input_xml_file_path, std::string& err_message)
-    {
-        IsaSpec spec;
-        if (!IsaXmlReader::ReadSpec(input_xml_file_path, spec, err_message))
-        {
-            return false;
-        }
-        return InitializeStrategy(std::move(spec), err_message);
-    }
-
-    bool IsaDecoder::IsaDecoderImpl::Initialize(const char* input_xml_data, size_t datalen, std::string& err_message)
-    {
-        IsaSpec spec;
-        if (!IsaXmlReader::ReadSpec(input_xml_data, datalen, spec, err_message))
-        {
-            return false;
-        }
-        return InitializeStrategy(std::move(spec), err_message);
-    }
-
-    bool IsaDecoder::Initialize(const std::string& input_xml_file_path, std::string& err_message)
-    {
-        delete api_impl_;
-        api_impl_ = new IsaDecoderImpl();
-        if (!api_impl_->Initialize(input_xml_file_path, err_message))
-        {
-            delete api_impl_;
-            api_impl_ = nullptr;
-            return false;
-        }
-        return true;
-    }
-
-    bool IsaDecoder::Initialize(const char *input_xml_data, const size_t datalen, std::string& err_message)
-    {
-        delete api_impl_;
-        api_impl_ = new IsaDecoderImpl();
-        if (!api_impl_->Initialize(input_xml_data, datalen, err_message))
-        {
-            delete api_impl_;
-            api_impl_ = nullptr;
-            return false;
-        }
-        return true;
-    }
-
-    std::string IsaDecoder::GetVersion() const
-    {
-        return amdisa::ApiVersion::GetVersion();
-    }
-
     bool IsaDecoder::DecodeShaderDisassemblyText(const std::string&                  shader_disassembly_text,
-                                                 std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                                 std::string&                        err_message,
-                                                 bool                                resolve_direct_branch_targets) const
+                                                        std::vector<InstructionInfoBundle>& instruction_info_stream,
+                                                        std::string&                        err_message,
+                                                        bool                                resolve_direct_branch_targets) const
     {
-        if (api_impl_ == nullptr) { err_message = kStringErrorSpecNotInitialized; return false; }
-        return api_impl_->DecodeShaderDisassemblyText(shader_disassembly_text, instruction_info_stream, err_message, resolve_direct_branch_targets);
+        bool        is_success = true;
+        std::string disassembly_text;
+
+        // PC and index pair map for branch target resolution
+        // Indexes are of instruction_info_stream
+        std::vector<std::string> pc_to_index_map = {};
+
+        // PC and label pair.
+        std::unordered_map<std::string, std::string> pc_to_label_map = {};
+
+        if (is_success)
+        {
+            is_success =
+                ExtractDisassembly(disassembly_text, shader_disassembly_text, err_message, resolve_direct_branch_targets, pc_to_index_map, pc_to_label_map);
+        }
+
+        // Decode the extracted instructions
+        if (is_success)
+        {
+            is_success = DecodeShaderDisassembly(disassembly_text,
+                                                 instruction_info_stream,
+                                                 err_message,
+                                                 resolve_direct_branch_targets,
+                                                 pc_to_index_map,
+                                                 pc_to_label_map);
+        }
+        return is_success;
     }
 
     bool IsaDecoder::DecodeShaderDisassemblyFile(const std::string&                  shader_disassembly_file,
-                                                 std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                                 std::string&                        err_message,
-                                                 bool                                resolve_direct_branch_targets) const
+                                                        std::vector<InstructionInfoBundle>& instruction_info_stream,
+                                                        std::string&                        err_message,
+                                                        bool                                resolve_direct_branch_targets) const
     {
-        if (api_impl_ == nullptr) { err_message = kStringErrorSpecNotInitialized; return false; }
-        return api_impl_->DecodeShaderDisassemblyFile(shader_disassembly_file, instruction_info_stream, err_message, resolve_direct_branch_targets);
+        bool is_success = true;
+
+        // PC and index pair map for branch target resolution
+        // Indexes are of instruction_info_stream
+        std::vector<std::string> pc_to_index_map = {};
+
+        // PC and label pair.
+        std::unordered_map<std::string, std::string> pc_to_label_map = {};
+
+        // Read from file and prepare for extract
+        std::string shader_disassembly_file_text;
+        try
+        {
+            std::ifstream disassembly_file;
+            disassembly_file.open(shader_disassembly_file, std::ios::in);
+            if (disassembly_file.is_open())
+            {
+                while (!disassembly_file.eof() && is_success)
+                {
+                    std::string line;
+                    getline(disassembly_file, line);
+                    line = AmdIsaUtility::Strip(line);
+                    shader_disassembly_file_text += (line + kShaderTextDelimiter);
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            is_success = false;
+            err_message.append(e.what());
+        }
+
+        // Parse the instructions from the shader disassembly file
+        std::string shader_disassembly_text;
+        if (is_success)
+        {
+            is_success = ExtractDisassembly(
+                shader_disassembly_text, shader_disassembly_file_text, err_message, resolve_direct_branch_targets, pc_to_index_map, pc_to_label_map);
+        }
+
+        // Decode the extracted instructions
+        if (is_success)
+        {
+            is_success = DecodeShaderDisassembly(shader_disassembly_text,
+                                                 instruction_info_stream,
+                                                 err_message,
+                                                 resolve_direct_branch_targets,
+                                                 pc_to_index_map,
+                                                 pc_to_label_map);
+        }
+        return is_success;
     }
 
     bool IsaDecoder::DecodeInstructionStream(const std::vector<uint32_t>&        machine_code_stream,
-                                             std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                             std::string&                        err_message) const
-    {
-        if (api_impl_ == nullptr) { err_message = kStringErrorSpecNotInitialized; return false; }
-        return api_impl_->DecodeInstructionStream(machine_code_stream, instruction_info_stream, err_message);
-    }
-
-    bool IsaDecoderDefaultStrategy::DecodeInstructionStream(const std::vector<uint32_t>&        machine_code_stream,
-                                                              std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                                              std::string&                        err_message) const
+                                                     std::vector<InstructionInfoBundle>& instruction_info_stream,
+                                                     std::string&                        err_message) const
     {
         bool is_decode_failed = true;
 
+        bool is_api_init = data_->IsInitialized();
+
+        if (is_api_init)
         {
-            const amdisa::IsaSpec& spec_data = GetSpec();
+            const amdisa::IsaSpec& spec_data = data_->GetSpec();
 
             MachineCodeStream stream;
             stream.Init(machine_code_stream);
             std::vector<uint32_t> working_dwords;
             is_decode_failed = false;
-            VgprMsbState vgpr_msb_state;
-            const bool    kIsCdna5       = (GetArchitecture() == GpuArchitecture::kCdna5);
             while (!is_decode_failed && !stream.IsEmpty())
             {
                 // Get words from the machine code stream for the current instruction.
                 working_dwords.clear();
-                working_dwords.push_back(stream.GetNextDword(log_));
+                working_dwords.push_back(stream.GetNextDword(data_->GetLog()));
 
                 // Get the encoding.
-                auto encoding_ptr = GetEncodingIterator(GetEncodingMap(), working_dwords[0], spec_data);
+                auto encoding_ptr = GetEncodingIterator(data_->GetEncodingMap(), working_dwords[0], spec_data);
 
                 if (encoding_ptr != nullptr)
                 {
@@ -2181,7 +2046,7 @@ namespace amdisa
                     // Get next dword from instruction stream for wider encodings.
                     while (working_dwords.size() * 32 < encoding_ptr->bit_count)
                     {
-                        working_dwords.push_back(stream.GetNextDword(log_));
+                        working_dwords.push_back(stream.GetNextDword(data_->GetLog()));
                     }
 
                     // VOPD encoding requires special handling due to two opcodes.
@@ -2231,7 +2096,7 @@ namespace amdisa
                         // Get the opcode.
                         uint64_t    opcode_value = 0;
                         const auto& field_iterator =
-                            GetFieldIterator(working_dwords, opcode_field_name, encoding_ptr->microcode_format, opcode_value, log_);
+                            GetFieldIterator(working_dwords, opcode_field_name, encoding_ptr->microcode_format, opcode_value, data_->GetLog());
 
                         // EXP encoding has no OP field.
                         bool is_exp                  = encoding_ptr->name.find("EXP") != std::string::npos;
@@ -2245,21 +2110,21 @@ namespace amdisa
 
                             // Get the modifiers.
                             bool is_extracted =
-                                ExtractModifiers(working_dwords, *encoding_ptr, instruction_info.operand_modifiers, err_message, log_);
+                                ExtractModifiers(working_dwords, *encoding_ptr, instruction_info.operand_modifiers, err_message, data_->GetLog());
                             if (is_extracted)
                             {
                                 // Get the fields info into the container.
-                                RetrieveFieldInfo(working_dwords, encoding_ptr->microcode_format.bit_map, instruction_info, log_);
+                                RetrieveFieldInfo(working_dwords, encoding_ptr->microcode_format.bit_map, instruction_info, data_->GetLog());
                                 uint32_t second_dword = 0;
                                 if (working_dwords.size() > 1)
                                 {
                                     second_dword = working_dwords[1];
                                 }
                                 const auto& instruction_ptrs = GetInstructionPtrs(spec_data.architecture.id,
-                                                                                  GetInstructionMap(),
-                                                                                  GetInstructionEncodingMap(),
+                                                                                  data_->GetInstructionMap(),
+                                                                                  data_->GetInstructionEncodingMap(),
                                                                                   *encoding_ptr,
-                                                                                  GetEncodingConditionHandler(),
+                                                                                  data_->GetEncodingConditionHandler(),
                                                                                   working_dwords[0],
                                                                                   second_dword,
                                                                                   is_vopdx,
@@ -2283,7 +2148,7 @@ namespace amdisa
                                         // Retrieve all required dwords from the instruction stream.
                                         while (working_dwords.size() * 32 < encoding_ptr->bit_count)
                                         {
-                                            working_dwords.push_back(stream.GetNextDword(log_));
+                                            working_dwords.push_back(stream.GetNextDword(data_->GetLog()));
                                         }
                                     }
 
@@ -2332,13 +2197,13 @@ namespace amdisa
                                         // DMASK
                                         uint64_t dmask_value = 0;
                                         const auto& dmask_field_iterator =
-                                            GetFieldIterator(working_dwords, "DMASK", encoding_ptr->microcode_format, dmask_value, log_);
+                                            GetFieldIterator(working_dwords, "DMASK", encoding_ptr->microcode_format, dmask_value, data_->GetLog());
                                         bool has_dmask_field = (dmask_field_iterator != encoding_ptr->microcode_format.bit_map.end());
 
                                         // SADDR
                                         uint64_t    saddr_value = 0;
                                         const auto& saddr_field_iterator =
-                                            GetFieldIterator(working_dwords, "SADDR", encoding_ptr->microcode_format, saddr_value, log_);
+                                            GetFieldIterator(working_dwords, "SADDR", encoding_ptr->microcode_format, saddr_value, data_->GetLog());
                                         bool has_operand_saddr = (saddr_field_iterator != encoding_ptr->microcode_format.bit_map.end());
 
                                         // Get the operands.
@@ -2368,7 +2233,7 @@ namespace amdisa
                                                 // Get the value of the field.
                                                 uint64_t    field_value = 0;
                                                 const auto& field_iterator =
-                                                    GetFieldIterator(working_dwords, field_name, encoding.microcode_format, field_value, log_);
+                                                    GetFieldIterator(working_dwords, field_name, encoding.microcode_format, field_value, data_->GetLog());
                                                 bool is_field_found = field_iterator != encoding.microcode_format.bit_map.end();
 
                                                 // Known cases when the field name may not be present in the
@@ -2437,31 +2302,8 @@ namespace amdisa
                                                         {
                                                             // Get operand name. Expand the name to range format if operand size
                                                             // is greater than 32 bits.
-                                                            std::string operand_name         = predefined_value_iterator->name;
+                                                            const std::string operand_name   = predefined_value_iterator->name;
                                                             instruction_operand.operand_name = operand_name;
-
-                                                            // CDNA5: Apply VGPR MSBs to extend the 8-bit ISA field to a 10-bit logical address.
-                                                            // Modify operand_name in-place so that downstream range-expansion uses the correct base.
-                                                            if (kIsCdna5 && vgpr_msb_state.IsActive() &&
-                                                                operand_name.length() > 1 &&
-                                                                operand_name[0] == 'v' && std::isdigit(static_cast<uint8_t>(operand_name[1])))
-                                                            {
-                                                                const bool kIgnoresMsb = (instruction_info.instruction_name == "V_WMMA_LD_SCALE");
-                                                                if (!kIgnoresMsb)
-                                                                {
-                                                                    const uint8_t msb = vgpr_msb_state.GetMsbForField(
-                                                                        AmdIsaUtility::ToUpper(operand.encoding_field_name));
-                                                                    if (msb != 0)
-                                                                    {
-                                                                        const uint32_t logical_vgpr =
-                                                                            (static_cast<uint32_t>(msb) << 8) |
-                                                                            static_cast<uint32_t>(field_value);
-                                                                        operand_name                     = "v" + std::to_string(logical_vgpr);
-                                                                        instruction_operand.operand_name = operand_name;
-                                                                    }
-                                                                }
-                                                            }
-
                                                             if (operand_name.length() > 1)
                                                             {
                                                                 const bool kIsMimgEnc     = (encoding_ptr->name.find("MIMG") != std::string::npos);
@@ -2478,19 +2320,18 @@ namespace amdisa
                                                                 const bool is_next_digit = std::isdigit(static_cast<uint8_t>(operand_name[1]));
                                                                 const bool is_sgpr       = (operand_name[0] == 's') && (is_next_digit);
                                                                 const bool is_vgpr       = (operand_name[0] == 'v') && (is_next_digit);
-                                                                if (kIsListOperand &&
-                                                                    is_vgpr /* The is_vgpr check was added to ensure correct operand naming for CDNA5's tensor load and store lds instructions where he sgpr operand name is to be expanded as a range, and not a list. */)
+                                                                if (kIsListOperand)
                                                                 {
                                                                     instruction_operand.operand_name = mimg_workaround::GetNameAsList(working_dwords, encoding.microcode_format,
-                                                                        operand_type_iterator->predefined_values, GetMimgAcntTable(), GetArchitecture(),
-                                                                        log_);
+                                                                        operand_type_iterator->predefined_values, data_->GetMimgAcntTable(), GetArchitecture(),
+                                                                        data_->GetLog());
                                                                 }
                                                                 else if (kIsAddrOperand && !kIsNsa && kIsMimgEnc)
                                                                 {
                                                                     int32_t acnt = mimg_workaround::GetAcnt(working_dwords,
                                                                                                             encoding.microcode_format,
-                                                                                                            GetMimgAcntTable(),
-                                                                                                            log_);
+                                                                                                            data_->GetMimgAcntTable(),
+                                                                                                            data_->GetLog());
                                                                     if (acnt > 0)
                                                                     {
                                                                         instruction_operand.operand_name =
@@ -2503,7 +2344,7 @@ namespace amdisa
                                                                 }
                                                                 else if (kIsVsampleEnc && kIsVdataOperand && has_dmask_field && is_vgpr)
                                                                 {
-                                                                    uint8_t dmask_bitcount           = AmdIsaUtility::BitCount(dmask_value);
+                                                                    uint8_t dmask_bitcount = AmdIsaUtility::BitCount(dmask_value);
                                                                     instruction_operand.operand_size = dmask_bitcount * kDwordSize;
                                                                     instruction_operand.operand_name =
                                                                         GetNameAsRegisterRange(operand_name, instruction_operand.operand_size);
@@ -2513,7 +2354,7 @@ namespace amdisa
                                                                     instruction_operand.operand_size = kDwordSize;
                                                                 }
                                                                 else if (!kIsWaveDependent && (instruction_operand.operand_size > kDwordSize) &&
-                                                                         (is_sgpr || is_vgpr))
+                                                                    (is_sgpr || is_vgpr))
                                                                 {
                                                                     instruction_operand.operand_name =
                                                                         GetNameAsRegisterRange(operand_name, instruction_operand.operand_size);
@@ -2524,7 +2365,7 @@ namespace amdisa
                                                             {
                                                                 uint64_t    const_offset   = 0;
                                                                 const auto& field_iterator = GetFieldIterator(
-                                                                    working_dwords, "OFFSET", encoding.microcode_format, const_offset, log_);
+                                                                    working_dwords, "OFFSET", encoding.microcode_format, const_offset, data_->GetLog());
                                                                 if (const_offset > 0)
                                                                 {
                                                                     std::stringstream formatter;
@@ -2550,7 +2391,7 @@ namespace amdisa
                                                     {
                                                         assert(field_value <= UINT32_MAX);
                                                         instruction_operand.operand_name = GeneratePartitionedOperand(instruction_info.instruction_name,
-                                                            operand_type_iterator->microcode_format, static_cast<uint32_t>(field_value), log_);
+                                                            operand_type_iterator->microcode_format, static_cast<uint32_t>(field_value), data_->GetLog());
                                                         if (is_implied_literal)
                                                         {
                                                             is_prev_operand_lit   = true;
@@ -2590,7 +2431,7 @@ namespace amdisa
                                                             uint32_t          lit = working_dwords[working_dwords.size() - 1];
                                                             if (encoding.name.find("LITERAL") == std::string::npos)
                                                             {
-                                                                lit = stream.GetNextDword(log_);
+                                                                lit = stream.GetNextDword(data_->GetLog());
                                                             }
                                                             formatter << "lit(0x" << std::hex << lit << ")";
                                                             instruction_operand.operand_name = formatter.str();
@@ -2684,24 +2525,6 @@ namespace amdisa
                         }
                     }
 
-                    // CDNA5: Track S_SET_VGPR_MSB to maintain VGPR MSB state across the stream.
-                    if (kIsCdna5 && !is_decode_failed && !instruction_info_bundle.bundle.empty())
-                    {
-                        const auto& last_info = instruction_info_bundle.bundle.back();
-                        if (last_info.instruction_name == "S_SET_VGPR_MSB")
-                        {
-                            // The SIMM16 immediate is in encoding_fields as field "SIMM16".
-                            for (const auto& enc_field : last_info.encoding_fields)
-                            {
-                                if (enc_field.field_name == "SIMM16")
-                                {
-                                    vgpr_msb_state.Update(static_cast<uint8_t>(enc_field.field_value & 0xFF));
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
                     // Pop the inserted InstructionGroup if the decode failed.
                     if (is_decode_failed)
                     {
@@ -2721,35 +2544,15 @@ namespace amdisa
                 }
             }
         }
+        else
+        {
+            err_message = kStringErrorSpecNotInitialized;
+        }
 
         return !is_decode_failed;
     }
 
     bool IsaDecoder::DecodeInstruction(uint64_t machine_code, InstructionInfoBundle& instruction_info_bundle, std::string& err_message) const
-    {
-        if (api_impl_ == nullptr) { err_message = kStringErrorSpecNotInitialized; return false; }
-        return api_impl_->DecodeInstruction(machine_code, instruction_info_bundle, err_message);
-    }
-
-    bool IsaDecoder::DecodeInstruction(const std::string& instruction_name, InstructionInfo& instruction_info, std::string& err_message) const
-    {
-        if (api_impl_ == nullptr) { err_message = kStringErrorSpecNotInitialized; return false; }
-        return api_impl_->DecodeInstruction(instruction_name, instruction_info, err_message);
-    }
-
-    std::vector<std::string> IsaDecoder::GetDebugLog() const
-    {
-        if (api_impl_ == nullptr) { return {}; }
-        return api_impl_->GetDebugLog();
-    }
-
-    GpuArchitecture IsaDecoder::GetArchitecture() const
-    {
-        if (api_impl_ == nullptr) { return GpuArchitecture::kUnknown; }
-        return api_impl_->GetArchitecture();
-    }
-
-    bool IsaDecoderDefaultStrategy::DecodeInstruction(uint64_t machine_code, InstructionInfoBundle& instruction_info_bundle, std::string& err_message) const
     {
         // Pack into stream.
         std::vector<uint32_t> machine_code_stream;
@@ -2779,218 +2582,52 @@ namespace amdisa
         return is_decoded;
     }
 
-    bool IsaDecoderDefaultStrategy::DecodeInstruction(const std::string& instruction_name, InstructionInfo& instruction_info, std::string& err_message) const
+    bool IsaDecoder::DecodeInstruction(const std::string& instruction_name, InstructionInfo& instruction_info, std::string& err_message) const
     {
         bool is_retrieval_failed = false;
 
-        const amdisa::IsaSpec& spec_data = GetSpec();
+        bool is_api_init = data_->IsInitialized();
 
-        // Convert to upper case.
-        std::string instruction_name_all_caps = AmdIsaUtility::ToUpper(instruction_name);
-
-        // Find the instruction by name.
-        const auto& instructions_iterator = std::find_if(spec_data.instructions.begin(), spec_data.instructions.end(), [&](const Instruction& instruction) {
-            return instruction.name == instruction_name_all_caps;
-        });
-
-        if (instructions_iterator != spec_data.instructions.end())
+        if (is_api_init)
         {
-            // Instruction found -- save return values.
-            instruction_info.instruction_name        = instructions_iterator->name;
-            instruction_info.instruction_description = instructions_iterator->description;
+            const amdisa::IsaSpec& spec_data = data_->GetSpec();
+
+            // Convert to upper case.
+            std::string instruction_name_all_caps = AmdIsaUtility::ToUpper(instruction_name);
+
+            // Find the instruction by name.
+            const auto& instructions_iterator = std::find_if(spec_data.instructions.begin(), spec_data.instructions.end(), [&](const Instruction& instruction) {
+                return instruction.name == instruction_name_all_caps;
+            });
+
+            if (instructions_iterator != spec_data.instructions.end())
+            {
+                // Instruction found -- save return values.
+                instruction_info.instruction_name        = instructions_iterator->name;
+                instruction_info.instruction_description = instructions_iterator->description;
+            }
+            else
+            {
+                is_retrieval_failed = true;
+                err_message         = kStringErrorInstructionNotFoundInSpec + instruction_name;
+            }
         }
         else
         {
-            is_retrieval_failed = true;
-            err_message         = kStringErrorInstructionNotFoundInSpec + instruction_name;
+            err_message = kStringErrorSpecNotInitialized;
         }
 
         return !is_retrieval_failed;
     }
 
-    bool IsaDecoderDefaultStrategy::DecodeShaderDisassemblyText(const std::string&                  shader_disassembly_text,
-                                                                  std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                                                  std::string&                        err_message,
-                                                                  bool                                resolve_direct_branch_targets) const
+}  // namespace v1_1_1
+
+    namespace v1_1_1
     {
-        bool        is_success = true;
-        std::string disassembly_text;
-
-        // PC and index pair map for branch target resolution
-        // Indexes are of instruction_info_stream
-        std::vector<std::string> pc_to_index_map = {};
-
-        // PC and label pair.
-        std::unordered_map<std::string, std::string> pc_to_label_map = {};
-
-        if (is_success)
+        IIsaDecoderStrategy* CreateIsaDecoder(std::vector<std::string>& log)
         {
-            is_success =
-                ExtractDisassembly(disassembly_text, shader_disassembly_text, err_message, resolve_direct_branch_targets, pc_to_index_map, pc_to_label_map);
+            return new IsaDecoder(log);
         }
-
-        // Decode the extracted instructions
-        if (is_success)
-        {
-            is_success = DecodeShaderDisassembly(disassembly_text,
-                                                 instruction_info_stream,
-                                                 err_message,
-                                                 resolve_direct_branch_targets,
-                                                 pc_to_index_map,
-                                                 pc_to_label_map);
-        }
-        return is_success;
-    }
-
-    bool IsaDecoderDefaultStrategy::DecodeShaderDisassemblyFile(const std::string&                  shader_disassembly_file,
-                                                                  std::vector<InstructionInfoBundle>& instruction_info_stream,
-                                                                  std::string&                        err_message,
-                                                                  bool                                resolve_direct_branch_targets) const
-    {
-        bool is_success = true;
-
-        // PC and index pair map for branch target resolution
-        // Indexes are of instruction_info_stream
-        std::vector<std::string> pc_to_index_map = {};
-
-        // PC and label pair.
-        std::unordered_map<std::string, std::string> pc_to_label_map = {};
-
-        // Read from file and prepare for extract
-        std::string shader_disassembly_file_text;
-        try
-        {
-            std::ifstream disassembly_file;
-            disassembly_file.open(shader_disassembly_file, std::ios::in);
-            if (disassembly_file.is_open())
-            {
-                while (!disassembly_file.eof() && is_success)
-                {
-                    std::string line;
-                    getline(disassembly_file, line);
-                    line = AmdIsaUtility::Strip(line);
-                    shader_disassembly_file_text += (line + kShaderTextDelimiter);
-                }
-            }
-        }
-        catch (const std::exception& e)
-        {
-            is_success = false;
-            err_message.append(e.what());
-        }
-
-        // Parse the instructions from the shader disassembly file
-        std::string shader_disassembly_text;
-        if (is_success)
-        {
-            is_success = ExtractDisassembly(
-                shader_disassembly_text, shader_disassembly_file_text, err_message, resolve_direct_branch_targets, pc_to_index_map, pc_to_label_map);
-        }
-
-        // Decode the extracted instructions
-        if (is_success)
-        {
-            is_success = DecodeShaderDisassembly(shader_disassembly_text,
-                                                 instruction_info_stream,
-                                                 err_message,
-                                                 resolve_direct_branch_targets,
-                                                 pc_to_index_map,
-                                                 pc_to_label_map);
-        }
-        return is_success;
-    }
-
-    IsaDecoder::~IsaDecoder()
-    {
-        if (api_impl_ != nullptr)
-        {
-            delete api_impl_;
-            api_impl_ = nullptr;
-        }
-    }
-
-    // Decoder manager implementation.
-    struct DecodeManager::DecodeManagerImpl
-    {
-        std::map<GpuArchitecture, std::shared_ptr<IsaDecoder>> arch_to_decoder;
-    };
-
-    bool DecodeManager::Initialize(const std::vector<std::string>& input_spec_file_paths, std::string& err_message)
-    {
-        bool should_abort = false;
-
-        if (manager_impl_ == nullptr)
-        {
-            manager_impl_ = new DecodeManagerImpl();
-        }
-        else
-        {
-            delete manager_impl_;
-            manager_impl_ = new DecodeManagerImpl();
-        }
-
-        if (manager_impl_ == nullptr)
-        {
-            should_abort = true;
-            err_message  = kStringErrorManagerImplAllocationFailed;
-        }
-
-        // Initialize IsaDecoder for each XML spec paths provided.
-        for (auto path_iter = input_spec_file_paths.begin(); !should_abort && path_iter != input_spec_file_paths.end(); path_iter++)
-        {
-            std::string                 init_err_message;
-            std::shared_ptr<IsaDecoder> decoder         = std::make_shared<IsaDecoder>();
-            bool                        is_decoder_init = decoder->Initialize(*path_iter, init_err_message);
-            if (is_decoder_init)
-            {
-                GpuArchitecture architecture = decoder->GetArchitecture();
-                if (architecture != GpuArchitecture::kUnknown)
-                {
-                    manager_impl_->arch_to_decoder[architecture] = decoder;
-                }
-                else
-                {
-                    should_abort = true;
-                    err_message  = kStringErrorDecodeManagerUnknownArch;
-                }
-            }
-            else
-            {
-                should_abort = true;
-                std::stringstream error_ss;
-                error_ss << kStringErrorDecodeManagerInitFailed << *path_iter;
-                err_message = error_ss.str();
-            }
-        }
-
-        return !should_abort;
-    }
-
-    std::shared_ptr<IsaDecoder> DecodeManager::GetDecoder(GpuArchitecture architecture) const
-    {
-        std::shared_ptr<IsaDecoder> ret = nullptr;
-
-        // Get the decoder from the map.
-        auto decoder_iter = manager_impl_->arch_to_decoder.find(architecture);
-        if (decoder_iter != manager_impl_->arch_to_decoder.end())
-        {
-            ret = decoder_iter->second;
-        }
-        return ret;
-    }
-
-    DecodeManager::~DecodeManager()
-    {
-        if (manager_impl_ != nullptr)
-        {
-            delete manager_impl_;
-            manager_impl_ = nullptr;
-        }
-    }
-
-    bool BranchInfo::IsDirect() const
-    {
-        return !is_indirect;
-    }
+    }  // namespace v1_1_1
 
 }  // namespace amdisa

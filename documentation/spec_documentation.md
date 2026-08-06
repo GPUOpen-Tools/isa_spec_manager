@@ -132,9 +132,9 @@ List of child elements:
 | #  | Element       | XML element name | Description|
 | -- | ------------- | ---------------- | - |
 | 1. | Encoding name | \<EncodingName\>   | The encoding name the given instruction is represented in. Should match one of the names in the list of [\<Encodings\>](#encodings)|
-| 2. | EncodingCondition | \<ConditionName\> | Name of the condition that must be true to select this encoding. |
-| 2. | Opcode        | \<Opcode\>         | The opcode value of the instruction when represented in this encoding. |
-| 3. | Operands      | [\<Operands\>](#operands) | Lists all operands of the instruction when represented in this encoding. |
+| 2. | EncodingCondition | \<ConditionName\> | Name of the condition that must be true to select this encoding. The condition id attribute references the [\<ConditionId\>](#conditionid) defined in the corresponding [\<EncodingCondition\>](#encodingcondition). |
+| 3. | Opcode        | \<Opcode\>         | The opcode value of the instruction when represented in this encoding. |
+| 4. | Operands      | [\<Operands\>](#operands) | Lists all operands of the instruction when represented in this encoding. |
 
 ### \<Operands\>
 Hierarchy: \<Spec\> → \<ISA\> → \<Instructions\> → \<Instruction\> → \<InstructionEncodings\> → \<InstructionEncoding\>  → **\<Operands\>**
@@ -231,7 +231,15 @@ List of child elements:
 | #  | Element              | XML element name      | Description|
 | -- | -------------------- | --------------------- | - |
 | 1. | Condition name       | \<ConditionName\>       | Name of the condition. Used as a reference when decoding an instruction and determining which encoding to use.|
-| 2. | Condition expression | \<ConditionExpression\> | An abstract syntax tree. The tree encodes a boolean expression, which if evaluated to true signals that the extended version of the encoding must be used.|
+| 2. | Condition id         | [\<ConditionId\>](#conditionid) | Unique identifier for this condition. The ID is used for more efficient and robust decoding.|
+
+> [!NOTE]  
+> The `ConditionId` element is supported by XML schema version v1.2.0 and above.
+
+### \<ConditionId\>
+Hierarchy: \<Spec\> → \<ISA\> → \<Encodings\> → \<Encoding\> → \<EncodingConditions\> → \<EncodingCondition\> → **\<ConditionId\>**
+
+Description: a unique integer identifier for this encoding condition. The ID enables condition lookup by numeric key rather than by name, providing more efficient and robust decoding. The same ID is referenced by the condition id attribute on [\<ConditionName\>](#instructionencoding) within [\<InstructionEncoding\>](#instructionencoding).
 
 ### \<BitMap\> (MicrocodeFormat)
 Hierarchy: \<Spec\> → \<ISA\> → \<Encodings\> → \<Encoding\>  → \<MicrocodeFormat\> → **\<BitMap\>**
@@ -387,7 +395,13 @@ Description: provides the associated subgroup for the instruction in this archit
 
 ## Appendix A
 ### XML Specification Change Log
+#### v1.0.0 ➡️ v1.1.0
 | Change Type | Feature/Element | v1.0.0 | v1.1.0 | Notes |
 |-|-|-|-|-|
 | New Feature | \<Subtypes\> | Not available | Added | Enables grouping of operand types |
 | New Values | \<FunctionalSubgroup\> | Not available | MFMA, WMMA, TRANSCENDENTAL values added | Enables more granularity of grouping |
+
+#### v1.1.0 ➡️ v1.2.0
+| Change Type | Feature/Element | v1.1.0 | v1.2.0 | Notes |
+|-|-|-|-|-|
+| New Feature | [\<ConditionId\>](#conditionid) | Not available | Added | Unique integer identifier for encoding conditions. Enables condition lookup by numeric key rather than by name for more effective and robust decoding. |

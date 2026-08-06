@@ -29,6 +29,7 @@ set (ALL_H
     ${SRC_DIR}/common/amdisa_structures.h
     ${SRC_DIR}/common/amdisa_utility.h
     ${SRC_DIR}/common/isa_xml_reader.h
+    ${SRC_DIR}/common/xml_expression_tree_reader.h
 
     # Third party library headers.
     ${TINYXML_DIR}/tinyxml2.h
@@ -43,13 +44,14 @@ set (ALL_CPP
     ${SRC_DIR}/common/amdisa_utility.cpp
     ${SRC_DIR}/common/amdisa_structures.cpp
     ${SRC_DIR}/common/isa_xml_reader.cpp
+    ${SRC_DIR}/common/xml_expression_tree_reader.cpp
 
     # Third party source files.
     ${TINYXML_DIR}/tinyxml2.cpp
 )
 
 # Adding target.
-add_library(isa_explorer STATIC ${ALL_CPP})
+add_library(isa_explorer STATIC EXCLUDE_FROM_ALL ${ALL_CPP})
 # Static Library
 target_include_directories(isa_explorer PRIVATE
     ${SRC_DIR}/common
@@ -60,7 +62,7 @@ target_include_directories(isa_explorer PRIVATE
 
 
 # Dynamic Library
-add_library(isa_explorer_dynamic SHARED ${ALL_CPP})
+add_library(isa_explorer_dynamic SHARED EXCLUDE_FROM_ALL ${ALL_CPP})
 target_include_directories(isa_explorer_dynamic PRIVATE
     ${SRC_DIR}/common
     ${TINYXML_DIR}

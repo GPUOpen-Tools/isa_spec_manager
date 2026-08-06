@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
  */
 #ifndef API_VERSION_H_
 #define API_VERSION_H_
@@ -10,7 +10,7 @@
 
 // IsaDecoder version.
 #define AMDISA_DECODE_API_VERSION_MAJOR 1
-#define AMDISA_DECODE_API_VERSION_MINOR 2
+#define AMDISA_DECODE_API_VERSION_MINOR 3
 #define AMDISA_DECODE_API_VERSION_PATCH 0
 
 // IsaExplorer version.

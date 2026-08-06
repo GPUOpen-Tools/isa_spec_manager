@@ -11,7 +11,7 @@
 
 namespace amdisa
 {
-    // Supported architectures.
+    // Enumuartions of supported architectures.
     enum class GpuArchitecture
     {
         kUnknown,
@@ -23,7 +23,8 @@ namespace amdisa
         kCdna1,
         kCdna2,
         kCdna3,
-        kCdna4
+        kCdna4,
+        kCdna5
     };
 
     // Constants.
