@@ -20,6 +20,8 @@ make
 
 The above script will launch the cmake. The script will generate projects directory.
 
+See `prebuild_linux.sh -h` for additional build options and their details.
+
 ### Building on Windows
 ```
 cd ./isa_spec_manager/build
@@ -34,6 +36,8 @@ For example, to generate the solution for VS 2019 with the VS 2019 toolchain, ru
 ``
 ./prebuild_windows.bat --vs 2019
 ``
+
+See `prebuild_windows.bat -h` for additional build options and their details.
 
 ## Using the API
 For the API and specification documentation, please see the [documentation subfolder](https://github.com/GPUOpen-Tools/isa_spec_manager/tree/main/documentation).

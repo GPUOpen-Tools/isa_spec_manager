@@ -25,21 +25,37 @@ endif ()
 # XML ISA Spec Decoder API: accepts ISA Spec for specific architecture
 # and provides interface for decoding of instructions or data retrieval
 # for specific instructions in the architecture.
-add_subdirectory(./source/isa_decoder)
+if (EXCLUDE_ISA_DECODER)
+    message("-- Excluding ISA Decoder.")
+else()
+    add_subdirectory(./source/isa_decoder)
+endif ()
 
-if (EXCLUDE_ISA_CLI_EXAMPLES_TESTS)
-    message("-- Excluding CLI, examples and tests.")
+if (EXCLUDE_ISA_EXPLORER)
+    message("-- Excluding ISA Explorer.")
+else()
+    # ISA explorer API
+    add_subdirectory(./source/isa_explorer)
+endif ()
+
+if (EXCLUDE_ISA_EXAMPLES)
+    message("-- Excluding examples.")
 else()
     # Examples: demonstrates utilities and API features using example apps
     add_subdirectory(./source/examples)
+endif ()
 
+if (EXCLUDE_ISA_CLI)
+    message("-- Excluding CLI.")
+else()
     # CLI commands: provides command line interface implementation
     # for generation of various CLI programs.
     add_subdirectory(./source/isa_spec_cli)
+endif ()
 
-    # ISA explorer API
-    add_subdirectory(./source/isa_explorer)
-
+if (EXCLUDE_ISA_TESTS)
+    message("-- Excluding tests.")
+else()
     # Unit testing suite
     add_subdirectory(./test/source)
 endif ()

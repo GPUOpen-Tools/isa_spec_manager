@@ -21,12 +21,18 @@ echo Options:
 echo    --cmake              Path to cmake executable to use. If not specified, the cmake from PATH env variable will be used.
 echo    --tinyxml2_src_path  Path to TinyXML2 source. If not specified, the default TinyXML2 bundled with the isa_decoder will be used.
 echo    --vs                 Microsoft Visual Studio version. Currently supported values are: "2015", "2017", "2019" and "2022". The default is "2022".
-echo    --decoder_only       Only include the decoder library for this project; skip the command line interface, examples and tests.
+echo    --no-decoder         Exclude the ISA decoder library from the build.
+echo    --no-explorer        Exclude the ISA explorer library from the build.
+echo    --no-cli             Exclude the command line interface from the build.
+echo    --no-examples        Exclude the examples from the build.
+echo    --no-tests           Exclude the tests from the build.
 echo:
 echo Examples:
 echo    prebuild_windows.bat
 echo    prebuild_windows.bat --vs 2022
 echo    prebuild_windows.bat --vs 2022 --tinyxml2_src_path [path to custom tinyxml2]
+echo    prebuild_windows.bat --no-explorer --no-cli --no-examples --no-tests
+echo    prebuild_windows.bat --no-decoder --no-cli --no-examples --no-tests
 
 goto :exit
 
@@ -37,7 +43,11 @@ set CURRENT_DIR=%CD%
 rem Default values
 set CMAKE_PATH=cmake
 set VS_VER=2022
-set DECODER_ONLY=
+set EXCLUDE_DECODER=
+set EXCLUDE_EXPLORER=
+set EXCLUDE_CLI=
+set EXCLUDE_EXAMPLES=
+set EXCLUDE_TESTS=
 set TINYXML=
 
 :begin
@@ -45,7 +55,11 @@ if [%1]==[] goto :start_cmake
 if "%1"=="--cmake" goto :set_cmake
 if "%1"=="--vs" goto :set_vs
 if "%1"=="--tinyxml2_src_path" goto :set_tinyxml2_src_path
-if "%1"=="--decoder_only" goto :set_decoder_only
+if "%1"=="--no-decoder" goto :set_no_decoder
+if "%1"=="--no-explorer" goto :set_no_explorer
+if "%1"=="--no-cli" goto :set_no_cli
+if "%1"=="--no-examples" goto :set_no_examples
+if "%1"=="--no-tests" goto :set_no_tests
 goto :bad_arg
 
 :set_cmake
@@ -64,8 +78,24 @@ goto :shift_2args
 @echo on
 goto :shift_arg
 
-:set_decoder_only
-set DECODER_ONLY="-DEXCLUDE_ISA_CLI_EXAMPLES_TESTS=ON"
+:set_no_decoder
+set EXCLUDE_DECODER=-DEXCLUDE_ISA_DECODER=ON
+goto :shift_arg
+
+:set_no_explorer
+set EXCLUDE_EXPLORER=-DEXCLUDE_ISA_EXPLORER=ON
+goto :shift_arg
+
+:set_no_cli
+set EXCLUDE_CLI=-DEXCLUDE_ISA_CLI=ON
+goto :shift_arg
+
+:set_no_examples
+set EXCLUDE_EXAMPLES=-DEXCLUDE_ISA_EXAMPLES=ON
+goto :shift_arg
+
+:set_no_tests
+set EXCLUDE_TESTS=-DEXCLUDE_ISA_TESTS=ON
 goto :shift_arg
 
 :shift_2args
@@ -113,10 +143,12 @@ rem Invoke cmake with required arguments.
 echo:
 echo Running cmake to generate a VisualStudio solution...
 cd %OUTPUT_FOLDER%
-%CMAKE_PATH% %DECODER_ONLY% %TINYXML% -G %CMAKE_VS% %CMAKE_VSARCH% ..\..\..
+%CMAKE_PATH% %EXCLUDE_DECODER% %EXCLUDE_EXPLORER% %EXCLUDE_CLI% %EXCLUDE_EXAMPLES% %EXCLUDE_TESTS% %TINYXML% -G %CMAKE_VS% %CMAKE_VSARCH% ..\..\..
 if not %ERRORLEVEL%==0 (
     echo "ERROR: cmake failed. Aborting..."
     exit /b 1
 )
 cd %CURRENT_DIR%
 echo Done.
+
+:exit
