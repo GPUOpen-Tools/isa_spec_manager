@@ -1783,6 +1783,9 @@ namespace v1_1_1
         std::string           inst;
         while (is_success && std::getline(inst_stream, inst, kShaderTextDelimiter))
         {
+            // Index this line's entry will have, so that a failed line keeps its own slot.
+            const size_t line_index = instruction_info_stream.size();
+
             std::stringstream stream;
             stream << inst;
             static const uint8_t kDwordByte = 8;
@@ -1847,18 +1850,12 @@ namespace v1_1_1
                 ErrorInstructionInfo.encoding_name           = kStringNa;
                 ErrorInstructionInfo.encoding_description    = kStringNa;
                 ErrorInstructionInfo.encoding_layout         = kStringNa;
-                if (instruction_info_stream.empty())
-                {
-                    amdisa::InstructionInfoBundle ErrorInstructionBundle;
-                    ErrorInstructionBundle.bundle.push_back(ErrorInstructionInfo);
-                    instruction_info_stream.push_back(ErrorInstructionBundle);
-                }
-                else
-                {
-                    amdisa::InstructionInfoBundle& ErrorInstructionBundle = instruction_info_stream.back();
-                    ErrorInstructionBundle.bundle.clear();
-                    ErrorInstructionBundle.bundle.push_back(ErrorInstructionInfo);
-                }
+                // Replace whatever the failed decode left for this line (nothing, or a partial
+                // entry) with a single N/A entry, without touching entries of previous lines.
+                instruction_info_stream.resize(line_index);
+                amdisa::InstructionInfoBundle ErrorInstructionBundle;
+                ErrorInstructionBundle.bundle.push_back(ErrorInstructionInfo);
+                instruction_info_stream.push_back(ErrorInstructionBundle);
 
                 std::stringstream err_ss;
                 err_ss << kStringErrorShaderTextDecodeFailed << "(" << inst << ")";
